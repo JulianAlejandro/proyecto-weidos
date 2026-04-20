@@ -4,6 +4,9 @@
 #include <Arduino.h>
 #include <vector>
 
+// Definimos el tipo de callback: una función que recibe un puntero a char (la línea)
+typedef void (*LineCallback)(const char* line);
+
 class SDManager {
 private:
     //uint8_t _csPin;
@@ -16,26 +19,19 @@ public:
 
     // Inicialización
     bool begin();
-    //bool isReady() { return _initialized; }
 
     // Utilidades de Archivo Genéricas
     bool exists(const char* path);
     //bool remove(const char* path);
     void clearFile(const char* path);
 
-    // Lectura Optimizada: Busca una línea que empiece por un ID (ej: "19000")
-    // y copia el resto de la línea en destBuffer.
-    bool getLineByID(const char* path, const char* id, char* destBuffer, size_t bufferSize);
-
+    // Nueva versión con Callback: No devuelve nada, solo "notifica" cuando encuentra una línea
+    void getLinesByRange(const char* path, long start, long end, LineCallback callback);
+    
     // Escritura Optimizada
+    bool getLineByID(const char* path, const char* id, char* destBuffer, size_t bufferSize);
     bool appendLine(const char* path, const char* data);
-    
-    void getLinesByRange(const char* path, long start, long end, std::vector<String>& result);
-
     void printFileToSerial(const char* path);
-    
-    // Acceso directo al objeto File si fuera necesario (usar con cuidado)
-    //File openFile(const char* path, const char* mode = FILE_READ);
 };
 
 #endif

@@ -118,6 +118,38 @@ bool SDManager::getLineByID(const char* path, const char* id, char* destBuffer, 
     return false; // No se encontró el ID
 }
 
+void SDManager::getLinesByRange(const char* path, long start, long end, LineCallback callback) {
+    File file = SD.open(path, FILE_READ);
+    if (!file) {
+        Serial.println(F("Error: No se pudo abrir archivo para rango"));
+        return;
+    }
+
+    char lineBuffer[128]; // Buffer para leer cada línea. Ajusta el tamaño según tu archivo setup.
+
+    while (file.available()) {
+        // Leemos la línea directamente al buffer (ahorro máximo de RAM)
+        int bytesRead = file.readBytesUntil('\n', lineBuffer, sizeof(lineBuffer) - 1);
+        lineBuffer[bytesRead] = '\0'; // Terminador nulo
+
+        // Buscamos el ID (primer campo antes del ';')
+        char* sepIdx = strchr(lineBuffer, ';');
+        if (sepIdx != nullptr) {
+            // Convertimos temporalmente el primer campo a número
+            // (Hacemos que el ';' sea un '\0' momentáneamente para usar atol)
+            *sepIdx = '\0';
+            long idFound = atol(lineBuffer);
+            *sepIdx = ';'; // Restauramos el ';'
+
+            // Si está en el rango, disparamos el callback
+            if (idFound >= start && idFound <= end) {
+                callback(lineBuffer);
+            }
+        }
+    }
+    file.close();
+}
+/*
 void SDManager::getLinesByRange(const char* path, long start, long end, std::vector<String>& result) {
     File file = SD.open(path, FILE_READ);
     if (!file) {
@@ -150,6 +182,7 @@ void SDManager::getLinesByRange(const char* path, long start, long end, std::vec
     }
     file.close();
 }
+*/
 
 void SDManager::printFileToSerial(const char* path) {
     File f = SD.open(path, FILE_READ);

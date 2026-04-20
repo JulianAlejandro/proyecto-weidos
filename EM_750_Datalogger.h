@@ -8,6 +8,7 @@
 #include "SDManager.h"
 #include <vector>
 
+
 #define NUM_COL_REG_EM750 5
 
 struct reg_EM_750 {
@@ -72,10 +73,8 @@ public:
     // Debug
     void printLogToSerial();
 
-    /**
-     * @brief Devuelve cuántos registros Modbus ocupa un formato.
-     * FLOAT/INT32 = 2 registros, INT16 = 1 registro.
-     */
+
+
     static int getFormatSize(const String& format) {
         if (format == "LONG64") return FormatWeight::LONG64;
         
@@ -86,6 +85,7 @@ public:
         // SHORT, USHORT, BYTE, INT16, UINT16, STRING, DFLOAT
         return FormatWeight::SHORT; 
     }
+    
 };
 
 #endif

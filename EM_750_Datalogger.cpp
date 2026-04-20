@@ -225,7 +225,7 @@ std::vector<String> EM750_Datalogger::getRowsStringByAddressRange(long addrStart
     std::vector<String> resultados;
     
     // El Datalogger le pide al Manager que rellene el vector
-    _sd->getLinesByRange(_setupFile.c_str(), addrStart, addrFin, resultados);
+    //_sd->getLinesByRange(_setupFile.c_str(), addrStart, addrFin, resultados);
     
     return resultados;
 }
