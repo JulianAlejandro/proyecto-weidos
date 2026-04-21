@@ -138,29 +138,35 @@ bool SDManager::openFile(const char* path){
     return _currentFile;
 }
 
-bool SDManager::getNextLineInRange(long start, long end, char* buffer, size_t size) {
+bool SDManager::getNextLineInRange(long start_addr, long size, char* buffer, size_t buffer_size) {
     if (!_currentFile || !_currentFile.available()) return false;
 
+    // Calculamos el límite superior basado en el tamaño solicitado
+    long end_addr = start_addr + size;
+
     while (_currentFile.available()) {
-        int bytesRead = _currentFile.readBytesUntil('\n', buffer, size - 1);
+        // Leemos la línea hasta el salto de línea
+        int bytesRead = _currentFile.readBytesUntil('\n', buffer, buffer_size - 1);
         buffer[bytesRead] = '\0';
 
+        // Si la línea está vacía (solo un \n), saltamos a la siguiente
         if (bytesRead == 0) continue;
 
-        // Lógica de filtrado por ID (reutilizando tu código)
+        // Buscamos el delimitador ';' para extraer el ID
         char* sepIdx = strchr(buffer, ';');
         if (sepIdx != nullptr) {
             char originalChar = *sepIdx;
-            *sepIdx = '\0';
+            *sepIdx = '\0'; // Truncamos temporalmente para usar atol
             long idFound = atol(buffer);
-            *sepIdx = originalChar;
+            *sepIdx = originalChar; // Restauramos el carácter original
 
-            if (idFound >= start && idFound <= end) {
-                return true; // Encontramos una línea válida, salimos para procesarla
+            // Comparamos el ID encontrado con el nuevo rango definido
+            if (idFound >= start_addr && idFound <= end_addr) {
+                return true; 
             }
         }
     }
-    return false; // No hay más líneas en el rango
+    return false; 
 }
 
 void SDManager::closeFile(){

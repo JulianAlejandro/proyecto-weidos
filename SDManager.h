@@ -25,7 +25,7 @@ public:
     // Utilidades de Archivo Genéricas
     //dapertura de archivo para lectura secuencial
     bool openFile(const char* path); // No gusta que esta funcion sea publica
-    bool getNextLineInRange (long start, long end, char* buffer, size_t size); 
+    bool getNextLineInRange (long start, long size, char* buffer, size_t buffer_size); 
     void closeFile(); // no gusta que esta funcion sea publica
 
     bool exists(const char* path);

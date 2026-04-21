@@ -7,6 +7,8 @@
 #include "EnergyMeter750.h"
 #include "SDManager.h"
 
+#include "SDRegisterMap.h"
+
 //#include <ArduinoRS485.h>
 //#include <String>
 
@@ -21,6 +23,8 @@ RTC_DS3231 rtc;
 
 //---Objetos de Gestion 
 SDManager sd;
+SDRegisterMap RegMap(&sd);
+
 //EM750_Datalogger data_logger(&sd,"/example2.txt", "/tabla.txt");  
 EnergyMeter750 energy_meter(1); // ID de esclavo 1
 
@@ -53,6 +57,11 @@ void setup() {
   
   Serial.begin(115200);
  
+  if(!RegMap.begin()){
+      Serial.print("malas noticias");
+  }
+  
+ 
   if (! rtc.begin()) { // todo while(1) bloquea al micro, cambiar
   while (1) printErrorNoRTC(); 
   }
@@ -61,7 +70,7 @@ void setup() {
 //necesita de SD manager para leer los registros de de setup y leer correctamente los registros con modbus
 // necesita modbus para leer los registros. 
 
-  if(!energy_meter.begin(&sd, &modbusTCPClient)){
+  if(!energy_meter.begin(&modbusTCPClient)){ // se le pasa el tipo de conexion y acceso a funciones de la SD 
     Serial.println("error al iniciar el energy meter");
   }
 
@@ -77,6 +86,8 @@ void setup() {
 }
 
 void loop() {
+
+  
 
   unsigned long actualMillis = millis();
 
@@ -95,10 +106,12 @@ void loop() {
 
 void ejecutarLecturaModbus() {
 
+  
+
   Serial.println("--- Iniciando Captura de Datos ---");
 
 
-  energy_meter.readAndProcess_2(19000, 19120, procesarRegistroIndividual); // TODO cambiar lo de los rangos 
+  energy_meter.readAndProcess_2(19000, 120, &RegMap, procesarRegistroIndividual); // TODO cambiar lo de los rangos 
     // 4. FINALIZAR SESIÓN (Escribe el salto de línea \n y cierra el archivo)
     //data_logger.endRowSession();
 

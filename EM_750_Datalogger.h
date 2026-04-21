@@ -1,3 +1,5 @@
+
+/*
 //TODO: de esta clase hay que quitar todos los std::vector que no son necesarioas 
 //hay que hacer todas las modificaciones para limitar los registros en RAM
 #ifndef EM750_DATALOGGER_H
@@ -90,3 +92,4 @@ public:
 
 #endif
 
+*/

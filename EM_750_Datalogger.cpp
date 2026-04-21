@@ -1,3 +1,4 @@
+/*
 #include "EM_750_Datalogger.h"
 
 
@@ -9,7 +10,7 @@ EM750_Datalogger::EM750_Datalogger(SDManager* sdManager, const String& setupFile
 }
 
 
-/*// el antiguo sin referencia a administrador de SD 
+// el antiguo sin referencia a administrador de SD 
 // Constructor: Inicializa las rutas de los archivos de configuración y de registro
 EM750_Datalogger::EM750_Datalogger(const String& setupFile, const String& logFile) {
     _setupFile = setupFile;
@@ -17,7 +18,7 @@ EM750_Datalogger::EM750_Datalogger(const String& setupFile, const String& logFil
     //_csPin = csPin;
 }
 
-*/
+
 
 // Inicializa la tarjeta SD y verifica si el archivo de configuración existe
 //TODO: Añadir codigo para analizar si existen los ficheros o no etc
@@ -265,3 +266,5 @@ std::vector<String> EM750_Datalogger::getRowsStringByAddressRange(long addrStart
     }
     return filaParaSD; 
  }
+
+*/

@@ -1,19 +1,21 @@
 
 #include "EnergyMeter750.h"
-
+#include "SDRegisterMap.h"
 
 EnergyMeter750::EnergyMeter750(uint8_t slaveAddress) {
     _slaveAddress = slaveAddress;
 }
 
-int EnergyMeter750::begin(SDManager* sdManager, ModbusTCPClient* modbusClient) {
+int EnergyMeter750::begin(ModbusTCPClient* modbusClient) {
     _modbus = modbusClient;
-     _sd = sdManager;
+     //_sd = sdManager;
 
+/*
     if (!_sd->begin()) {
         Serial.println(F("Error: No se pudo iniciar la SD desde Datalogger"));
         return false;
     }
+*/
 
 /*
     // 2. Verificamos si el archivo de configuración existe usando el manager
@@ -26,50 +28,81 @@ int EnergyMeter750::begin(SDManager* sdManager, ModbusTCPClient* modbusClient) {
     return true;
 }
 
-//TODO: MODIFICAR  
-bool EnergyMeter750::readAndProcess_2(long start, long end, void (*callback)(float)) {
-    String _setupFile = "/example2.txt"; // 
-    
-    int modbus_data_size = 0;
-    std::vector<reg_EM_750> registros;
-    char lineBuffer[128];
+bool EnergyMeter750::readAndProcess_2(long start_addr, long size, SDRegisterMap* mapa, void (*callback)(float)) {
+    if (mapa == nullptr || _modbus == nullptr) return false;
 
-    // PASO 1: Escanear SD para saber cuántos registros pedir y guardarlos
-    if (_sd->openFile(_setupFile.c_str())) {
-        while (_sd->getNextLineInRange(start, end, lineBuffer, sizeof(lineBuffer))) {
-            reg_EM_750 aux;
-            if (splitString(lineBuffer, ';', aux)) {
-                modbus_data_size += getFormatSize(aux.data[FORMAT]);
-                registros.push_back(aux);
-            }
-        }
-        _sd->closeFile();
+    // PASO 1: Obtener el mapa de formatos desde la SD
+    std::vector<coded_format> formatos = mapa->devuelveRegData(start_addr, size);
+    if (formatos.empty()) return false;
+
+    // PASO 2: Calcular cuántos registros Modbus (16-bit cada uno) necesitamos pedir
+    int modbus_data_size = 0;
+    for (coded_format f : formatos) {
+        modbus_data_size += getFormatSize(f);
     }
 
-    // PASO 2: Petición Modbus única
-    std::vector<uint16_t> val; 
-    if (_modbus->requestFrom(_slaveAddress, INPUT_REGISTERS, start, modbus_data_size)) {
+    // PASO 3: Petición Modbus única para todo el bloque
+    std::vector<uint16_t> rawValues;
+    rawValues.reserve(modbus_data_size);
+
+    if (_modbus->requestFrom(_slaveAddress, INPUT_REGISTERS, start_addr, modbus_data_size)) {
         while (_modbus->available()) {
-            val.push_back(_modbus->read());
+            rawValues.push_back(_modbus->read());
         }
     } else {
-        return false; // Error de comunicación
+        return false; // Error de comunicación Modbus
     }
 
-    // PASO 3: Procesar los datos obtenidos con la lista de registros guardada
-    for (const auto& reg : registros) {
-        int idx = reg.data[ADDR].toInt() - start;
+    // PASO 4: Procesar y convertir los datos según el formato
+    int idx = 0; // Índice para movernos por el array rawValues
+    for (coded_format f : formatos) {
         
-        if (reg.data[FORMAT] == "FLOAT" && (idx + 1) < val.size()) {
-            uint32_t combinado = ((uint32_t)val[idx] << 16) | val[idx+1];
-            float resultado;
-            memcpy(&resultado, &combinado, sizeof(resultado));
-            callback(resultado);
+        if (f == FLOAT) {
+            if (idx + 1 < rawValues.size()) {
+                // Combinamos dos registros de 16 bits en uno de 32
+                uint32_t combinado = ((uint32_t)rawValues[idx] << 16) | rawValues[idx + 1];
+                float resultado;
+                memcpy(&resultado, &combinado, sizeof(resultado));
+                
+                callback(resultado);
+                idx += 2; // Avanzamos 2 registros
+            }
+        } 
+        else if (f == INT || f == UINT) {
+            // Ejemplo para otros formatos de 32 bits (2 registros)
+            idx += 2;
         }
-        // Aquí puedes añadir más formatos (INT, LONG...) fácilmente
+        else if (f == SHORT || f == USHORT || f == BYTE) {
+            // Ejemplo para formatos de 16 bits (1 registro)
+            // float val = (float)rawValues[idx];
+            // callback(val);
+            idx += 1;
+        }
+        // ... añadir más casos según necesites
     }
 
     return true;
+}
+
+/**
+ * Función auxiliar para saber cuántos registros Modbus ocupa cada formato
+ */
+int EnergyMeter750::getFormatSize(coded_format f) {
+    switch (f) {
+        case FLOAT:
+        case INT:
+        case UINT:
+            return 2; // 32 bits = 2 registros Modbus
+        case LONG64:
+            return 4; // 64 bits = 4 registros Modbus
+        case SHORT:
+        case USHORT:
+        case BYTE:
+        case DFLOAT:
+            return 1; // 16 bits = 1 registro Modbus
+        default:
+            return 0;
+    }
 }
 
 /*
@@ -129,7 +162,7 @@ bool EnergyMeter750::readAndProcess_2(long start, long end, void (*callback)(flo
    
 }
 */
-
+/*
 bool EnergyMeter750::splitString(const char* linea, char div_char, reg_EM_750 &resultado) {
     // 1. Limpieza preventiva del struct
     for (int i = 0; i < NUM_COL_REG_EM750; i++) {
@@ -182,3 +215,4 @@ bool EnergyMeter750::splitString(const char* linea, char div_char, reg_EM_750 &r
 
     return (col == NUM_COL_REG_EM750);
 }
+*/
