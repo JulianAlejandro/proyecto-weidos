@@ -1,15 +1,13 @@
 
 #include "EnergyMeter750.h"
 
-int EnergyMeter750::modbus_data_size = 0; // TODO CAMBIAR CORREGIR MAL
-std::vector<reg_EM_750> EnergyMeter750::registros;
 
 EnergyMeter750::EnergyMeter750(uint8_t slaveAddress) {
     _slaveAddress = slaveAddress;
 }
 
-int EnergyMeter750::begin(SDManager* sdManager, ModbusTCPClient& modbusClient) {
-    _modbus = &modbusClient;
+int EnergyMeter750::begin(SDManager* sdManager, ModbusTCPClient* modbusClient) {
+    _modbus = modbusClient;
      _sd = sdManager;
 
     if (!_sd->begin()) {
@@ -28,51 +26,53 @@ int EnergyMeter750::begin(SDManager* sdManager, ModbusTCPClient& modbusClient) {
     return true;
 }
 
-/*
-bool EnergyMeter750::readAndProcess(ModbusBlock block, void (*callback)(uint16_t)) {
-    if (_modbus->requestFrom(_slaveAddress, INPUT_REGISTERS, block.startAddress, block.quantity)) {
-        for (int i = 0; i < block.quantity; i++) {
-            uint32_t val = _modbus->read();
-            // Enviamos la dirección actual y el valor al callback (que será el logger)
-            callback(block.startAddress + i, val);
-        }
-        return true;
-    }
-    return false;
-
-}
-
-*/
-
-/*
-// Esta función lee el bus y "escupe" los datos uno a uno para no llenar la RAM
-bool EnergyMeter750::readAndProcess(ModbusBlock block, void (*callback)(uint16_t, uint32_t)) {
-    if (_modbus->requestFrom(_slaveAddress, INPUT_REGISTERS, block.startAddress, block.quantity)) {
-        for (int i = 0; i < block.quantity; i++) {
-            uint32_t val = _modbus->read();
-            // Enviamos la dirección actual y el valor al callback (que será el logger)
-            callback(block.startAddress + i, val);
-        }
-        return true;
-    }
-    return false;
-}
-*/
-// 1. Creamos una función estática o global que reciba la línea
-void miProcesadorDeRegistros(const char* linea) {
-    // Aquí recibes, por ejemplo: "19000;FLOAT;RD;V;Voltaje L1"
-    // Puedes llamar a tu splitString o procesarlo directamente.
-    reg_EM_750 aux; 
-    //aqui podemos ir haciendo un split de cada linea para ver de que se trata y hacer la solicitud de rad and process
-    EnergyMeter750::splitString(linea, ';', aux);
-       // return 0; //error 
+//TODO: MODIFICAR  
+bool EnergyMeter750::readAndProcess_2(long start, long end, void (*callback)(float)) {
+    String _setupFile = "/example2.txt"; // 
     
-     //-> contiene los valores del registro, aqui hay que analizarlos uno a uno 
-    EnergyMeter750::modbus_data_size = EnergyMeter750::modbus_data_size + EnergyMeter750::getFormatSize(aux.data[FORMAT]);
-    EnergyMeter750::registros.push_back(aux);
+    int modbus_data_size = 0;
+    std::vector<reg_EM_750> registros;
+    char lineBuffer[128];
 
+    // PASO 1: Escanear SD para saber cuántos registros pedir y guardarlos
+    if (_sd->openFile(_setupFile.c_str())) {
+        while (_sd->getNextLineInRange(start, end, lineBuffer, sizeof(lineBuffer))) {
+            reg_EM_750 aux;
+            if (splitString(lineBuffer, ';', aux)) {
+                modbus_data_size += getFormatSize(aux.data[FORMAT]);
+                registros.push_back(aux);
+            }
+        }
+        _sd->closeFile();
+    }
+
+    // PASO 2: Petición Modbus única
+    std::vector<uint16_t> val; 
+    if (_modbus->requestFrom(_slaveAddress, INPUT_REGISTERS, start, modbus_data_size)) {
+        while (_modbus->available()) {
+            val.push_back(_modbus->read());
+        }
+    } else {
+        return false; // Error de comunicación
+    }
+
+    // PASO 3: Procesar los datos obtenidos con la lista de registros guardada
+    for (const auto& reg : registros) {
+        int idx = reg.data[ADDR].toInt() - start;
+        
+        if (reg.data[FORMAT] == "FLOAT" && (idx + 1) < val.size()) {
+            uint32_t combinado = ((uint32_t)val[idx] << 16) | val[idx+1];
+            float resultado;
+            memcpy(&resultado, &combinado, sizeof(resultado));
+            callback(resultado);
+        }
+        // Aquí puedes añadir más formatos (INT, LONG...) fácilmente
+    }
+
+    return true;
 }
 
+/*
 //TODO AQUI _setupFile.c_str() va hardcoded porque esta clase de momento no recibe el nombre del fichero de setup
 bool EnergyMeter750::readAndProcess_2(long start, long end, void (*callback)(float)){ // este creo que es el que devuelve el callback, esta es la funcion que se llama desde el cliente y devuelve un stream
      Serial.print("entramos 1");
@@ -128,7 +128,7 @@ bool EnergyMeter750::readAndProcess_2(long start, long end, void (*callback)(flo
     registros.clear(); 
    
 }
-
+*/
 
 bool EnergyMeter750::splitString(const char* linea, char div_char, reg_EM_750 &resultado) {
     // 1. Limpieza preventiva del struct
@@ -182,58 +182,3 @@ bool EnergyMeter750::splitString(const char* linea, char div_char, reg_EM_750 &r
 
     return (col == NUM_COL_REG_EM750);
 }
-
-/*
-// Divide una cadena de texto en columnas respetando las comillas dobles
-bool EnergyMeter750::splitString(const String& linea, char div_char, reg_EM_750 &resultado){
-// 1. Limpieza preventiva del struct
-    for (int i = 0; i < NUM_COL_REG_EM750; i++) {
-        resultado.data[i] = "";
-    }
-
-    int posInicio = 0;
-    int col = 0;
-    bool dentroDeComillas = false;
-    int n = linea.length();
-
-    // 2. Recorremos la línea carácter por carácter
-    for (int i = 0; i <= n; i++) {
-        char c = (i < n) ? linea[i] : '\0'; // Carácter actual o fin de cadena
-
-        // Detectar si entramos o salimos de una zona de comillas
-        if (c == '"') {
-            dentroDeComillas = !dentroDeComillas;
-        }
-
-        // Si encontramos el divisor (y no estamos en comillas) O llegamos al final de la cadena
-        if ((c == div_char && !dentroDeComillas) || i == n) {
-            if (col < NUM_COL_REG_EM750) {
-                String segmento = linea.substring(posInicio, i);
-                segmento.trim();
-                
-                // Opcional: Eliminar las comillas exteriores si existen en el segmento
-                if (segmento.startsWith("\"") && segmento.endsWith("\"")) {
-                    segmento = segmento.substring(1, segmento.length() - 1);
-                }
-                
-                resultado.data[col] = segmento;
-                col++;
-            }
-            posInicio = i + 1;
-        }
-    }
-
-    // Retorna true solo si llenamos exactamente las columnas definidas
-    return (col == NUM_COL_REG_EM750);
-
-}
-*/
-/*
-// ... tus otros includes ...
-#include "EnergyMeter750.h"
-
-
-EnergyMeter750::EnergyMeter750() {
-    // Cuerpo vacío
-}
-*/

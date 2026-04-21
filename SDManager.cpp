@@ -2,7 +2,6 @@
 
 #include "SDManager.h"
 
-#include <SD.h>
 #include <SPI.h>
 
 //TODO añadir un _initialize para que sea mas robusta la aplicacion, de momento no esta para no meter mas cosas de las necesarias 
@@ -24,7 +23,6 @@ bool SDManager::begin() {
     _initialized = SD.begin(_csPin);
     return _initialized;*/
     
-
 }
 
 
@@ -46,39 +44,9 @@ bool SDManager::appendLine(const char* path, const char* data) {
     f.close();
     return true;
 
-
-    /*
-        File myFile = SD.open(_logFile, FILE_WRITE); 
-
-    if (myFile) {
-        Serial.println("Escribiendo títulos (vector)...");
-        
-        for (size_t i = 0; i < titulos.size(); i++) {
-            // Creamos una copia para no modificar el vector original
-            String temp = titulos[i]; 
-            // Reemplazamos cualquier ';' por una ','
-            temp.replace(';', ','); 
-            
-            myFile.print(temp);
-            
-            if (i < titulos.size() - 1) {
-                myFile.print(";");
-            }
-        }
-        
-        myFile.println(); 
-        myFile.close(); 
-        Serial.println("Títulos guardados.");
-    } else {
-        Serial.println("Error al abrir para títulos.");
-    }
-
-    */
 }
 
 
-//TODO funcion especifica orientada a obtener el una fila completa en funcion del primer campo separado por ; que es id  
-// TODO: Esta funcion tiene que cambiar, necesito una funcion mas generica que me permita obtener una linea en funcion de cualquier campo, no solo id o pensar alternativa. 
 bool SDManager::getLineByID(const char* path, const char* id, char* destBuffer, size_t bufferSize) {
     File file = SD.open(path);
     if (!file) {
@@ -149,40 +117,7 @@ void SDManager::getLinesByRange(const char* path, long start, long end, LineCall
     }
     file.close();
 }
-/*
-void SDManager::getLinesByRange(const char* path, long start, long end, std::vector<String>& result) {
-    File file = SD.open(path, FILE_READ);
-    if (!file) {
-        Serial.println(F("Error: No se pudo abrir archivo para rango"));
-        return;
-    }
 
-    // Limpiamos el vector de resultados antes de empezar
-    result.clear();
-
-    while (file.available()) {
-        // Leemos la línea. Usamos readStringUntil provisionalmente 
-        // para mantener compatibilidad con tu lógica de vectores.
-        String line = file.readStringUntil('\n');
-        line.trim();
-
-        if (line.length() > 0) {
-            // Buscamos el primer ';' para obtener el ID/Dirección
-            int sepIdx = line.indexOf(';');
-            if (sepIdx != -1) {
-                // Convertimos el primer campo a número
-                long idFound = line.substring(0, sepIdx).toInt();
-
-                // Verificamos si está dentro del rango solicitado
-                if (idFound >= start && idFound <= end) {
-                    result.push_back(line);
-                }
-            }
-        }
-    }
-    file.close();
-}
-*/
 
 void SDManager::printFileToSerial(const char* path) {
     File f = SD.open(path, FILE_READ);
@@ -197,8 +132,38 @@ void SDManager::printFileToSerial(const char* path) {
     f.close();
 }
 
-/*
-File SDManager::openFile(const char* path, const char* mode) {
-    return SD.open(path, mode);
+
+bool SDManager::openFile(const char* path){
+    _currentFile = SD.open(path, FILE_READ);
+    return _currentFile;
 }
-*/
+
+bool SDManager::getNextLineInRange(long start, long end, char* buffer, size_t size) {
+    if (!_currentFile || !_currentFile.available()) return false;
+
+    while (_currentFile.available()) {
+        int bytesRead = _currentFile.readBytesUntil('\n', buffer, size - 1);
+        buffer[bytesRead] = '\0';
+
+        if (bytesRead == 0) continue;
+
+        // Lógica de filtrado por ID (reutilizando tu código)
+        char* sepIdx = strchr(buffer, ';');
+        if (sepIdx != nullptr) {
+            char originalChar = *sepIdx;
+            *sepIdx = '\0';
+            long idFound = atol(buffer);
+            *sepIdx = originalChar;
+
+            if (idFound >= start && idFound <= end) {
+                return true; // Encontramos una línea válida, salimos para procesarla
+            }
+        }
+    }
+    return false; // No hay más líneas en el rango
+}
+
+void SDManager::closeFile(){
+    if (_currentFile) _currentFile.close();
+}
+

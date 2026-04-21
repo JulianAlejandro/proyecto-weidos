@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <vector>
+#include <SD.h>
 
 // Definimos el tipo de callback: una función que recibe un puntero a char (la línea)
 typedef void (*LineCallback)(const char* line);
@@ -11,6 +12,7 @@ class SDManager {
 private:
     //uint8_t _csPin;
     //bool _initialized;
+    File _currentFile; 
 
 public:
     // Constructor
@@ -21,6 +23,11 @@ public:
     bool begin();
 
     // Utilidades de Archivo Genéricas
+    //dapertura de archivo para lectura secuencial
+    bool openFile(const char* path); // No gusta que esta funcion sea publica
+    bool getNextLineInRange (long start, long end, char* buffer, size_t size); 
+    void closeFile(); // no gusta que esta funcion sea publica
+
     bool exists(const char* path);
     //bool remove(const char* path);
     void clearFile(const char* path);

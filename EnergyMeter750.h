@@ -36,22 +36,15 @@ class EnergyMeter750 {
     uint8_t _slaveAddress;
     ModbusTCPClient* _modbus; // Usamos puntero para flexibilidad
     SDManager* _sd;
-
-    int idx_registros; 
-
-
-    //void miProcesadorDeRegistros(const char* linea);
+    bool splitString(const char* linea, char div_char, reg_EM_750 &resultado);
 
   public:
-        static int modbus_data_size; 
-    static std::vector<reg_EM_750> registros;  // TODO modificar a un valor de 125 registros por peticion. 
-    static bool splitString(const char* linea, char div_char, reg_EM_750 &resultado);
 
     // Constructor: le pasamos la dirección del esclavo
     EnergyMeter750(uint8_t slaveAddress);
     
     // Configura el cliente Modbus que usará
-    int begin(SDManager* sdManager, ModbusTCPClient& modbusClient);
+    int begin(SDManager* sdManager, ModbusTCPClient* modbusClient);
 
     // Definición de bloques comunes del EM750 (Ejemplos típicos)
     const ModbusBlock BLOCK_BASIC = { 19000, 2 }; // Voltajes, Corrientes
@@ -82,26 +75,3 @@ class EnergyMeter750 {
 };
 
 #endif
-/*
-#ifndef ENERGY_METER_750_H
-#define ENERGY_METER_750_H
-
-#include <ArduinoModbus.h>
-
-class EnergyMeter750 {
-  private:
-    //uint8_t _slaveAddress;
-    //ModbusTCPClient& _modbus; // Referencia al cliente externo
-
-  public:
-    EnergyMeter750();
-
-  private:
-
-};
-
-#endif
-
-
-*/
-
