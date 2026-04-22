@@ -17,6 +17,10 @@ struct reg_EM_750 {
     String data[NUM_COL_REG_EM750];
 };
 
+struct netFloatDataBuffer {
+    float* buffer;  // Puntero a los datos
+    uint16_t size;    // Cantidad de registros leídos
+};
 
 enum index_reg_EM750 { ADDR, FORMAT, RD_WR, UNIT, NOTE };
 
@@ -35,7 +39,7 @@ private:
 
     uint16_t _lastSizeReadRequestSended; 
 
-    float dataFloat[MAX_MODBUS_REGS];
+    float _dataFloat[MAX_MODBUS_REGS];
     uint16_t _sizeData; 
 
     bool splitString(const char* linea, char div_char, reg_EM_750 &resultado);
@@ -47,11 +51,10 @@ public:
 
     int begin();
 
-    EM_request startRequest (const uint16_t start_addr, const uint16_t size);
-    //std::vector<coded_format> devuelveRegData(long start_addr, long size); // de momento lo hacemos asi
-    float* getFloatValues(const uint16_t* datos, const uint16_t size);
+    EM_request startNewRequest (const uint16_t start_addr, const uint16_t size);
 
-    uint16_t getSizeData(){ return _sizeData; };
+    netFloatDataBuffer getFloatValues(const uint16_t* datos, const uint16_t size);
+
 
     // Función auxiliar para convertir String a Enum
     static coded_format stringToFormat(const String& str) {

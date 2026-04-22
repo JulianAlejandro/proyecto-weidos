@@ -1,4 +1,80 @@
 
+#ifndef DATALOGGER_H
+#define DATALOGGER_H
+
+#include <Arduino.h>
+#include "SDManager.h"
+
+class Datalogger {
+private:
+    String _logFile; 
+    SDManager* _sd;
+
+public:
+    Datalogger(SDManager* sdManager);
+
+    bool begin();
+    void setLogFile(const char* filename);
+    
+    // Escribe los títulos (ej: {"Timestamp", "Voltaje", "Corriente"})
+    // numTitulos: cantidad de elementos en el array
+    bool writeHeader(const char** titulos, uint16_t numTitulos); 
+
+    // Escribe una fila de datos numéricos
+    // values: el array de floats que viene del Interpreter
+    // numValues: cantidad de datos
+    bool writeRow(const uint32_t timestamp, const float* values, uint16_t numValues); 
+    
+    void clearLogFile();
+    void printLogToSerial();
+};
+
+#endif
+/*
+que hace un datalogger 
+- 1. begin. se inicializa lo que necesita que principalmente es el HW de la SD. 
+- 2. Se le puede decir que se desea hacer un nuevo log 
+    - fichero en el que va a ir almacenado todo 
+    - Solicita solo la primera entrada de tamaño N con los titulos 
+    - habilita una funcion de carga de valores pra recibir lineas de N tamaño de puros Strings 
+
+- 3. permite la limpieza del fichero 
+*/
+/*
+
+#ifndef DATALOGGER_H
+#define DATALOGGER_H
+
+#include <Arduino.h>
+#include "SDManager.h"
+
+class Datalogger {
+private:
+    
+    String _logFile; 
+    SDManager* _sd;
+    //uint8_t _csPin;
+
+public:
+    
+    Datalogger(SDManager* sdManager);
+
+    // Gestión del Sistema
+    bool begin();
+    void clearLogFile();
+    
+    // Escritura de Datos (Datalogging)
+    //void startLog();
+    //void writeHeader(const std::vector<String>& titulos); // MODIFICAR SIN VECTORES
+    //void writeRow(const std::vector<String>& datos); // MODIFICAR SIN VECTORES 
+    
+    // Debug
+    void printLogToSerial();
+    
+};
+
+#endif
+*/
 /*
 //TODO: de esta clase hay que quitar todos los std::vector que no son necesarioas 
 //hay que hacer todas las modificaciones para limitar los registros en RAM

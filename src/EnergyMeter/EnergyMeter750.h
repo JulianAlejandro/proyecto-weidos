@@ -7,12 +7,19 @@
 #include "EnergyMeterRegInterpreter.h"
 
 #define NUM_COL_REG_EM750 5
-#define MAX_MODBUS_REGS 125
+#define MAX_MODBUS_REGS_REQUEST 125
+#define MAX_EM_ADDR 22000
+
+struct RegDataBuffer {
+    uint16_t* buffer;  // Puntero a los datos
+    uint16_t size;    // Cantidad de registros leídos
+};
 
 class EnergyMeter750 {
   private:
     uint8_t _slaveAddress;
     ModbusTCPClient* _modbus; // Usamos puntero para flexibilidad
+
     uint16_t _internalBuffer[MAX_MODBUS_REGS];
     uint16_t _lastReadSize; 
 
@@ -26,13 +33,11 @@ class EnergyMeter750 {
     // Configura el cliente Modbus que usará
     int begin(ModbusTCPClient* modbusClient);
 
-    //uint16_t readAdress(long addr); 
+    uint16_t readData(uint16_t addr); 
 
-    uint16_t* getData(){ return _internalBuffer;}
-    uint16_t getLastSize() { return _lastReadSize; }
+    RegDataBuffer readDataBuffer(){ return { _internalBuffer, _lastReadSize };}
 
-    bool readRegisters(EM_request req);
-    //bool readAndProcess_2(long start_addr, long size, EnergyMeterRegInterpreter* mapa, void (*callback)(float));
+    bool executeRequest(EM_request req);
 
 };
 

@@ -14,17 +14,49 @@ SDManager::SDManager() {
 
 // TODO: pensar que mas cosas tiene que hacer el administrador de SD
 bool SDManager::begin() {
+    // Si ya estaba inicializada, no repetimos el proceso
+    if (_initialized) return true;
+
+    // SD.begin() devuelve true si la comunicación SPI 
+    // y el sistema de archivos FAT están listos.
+    _initialized = SD.begin(); 
+    
+    return _initialized;
+}
+
+/*
+bool SDManager::begin() {
 
     if (!SD.begin()) {
         return false;
     }
     return true; 
 
-    /*if (_initialized) return true;
-    _initialized = SD.begin(_csPin);
-    return _initialized;*/
+
     
 }
+
+*/
+
+bool SDManager::isReady() {
+    return _initialized;
+}
+
+/*
+bool SDManager::isReady() {
+    // Si ni siquiera se ha llamado a begin una vez, es false
+    if (!_initialized) return false;
+
+    // Intentamos verificar si el volumen sigue siendo accesible
+    // exists("/") es una operación rápida que confirma que el sistema FAT responde
+    if (!SD.exists("/")) {
+        _initialized = false; // Si falla, marcamos como no listo
+        return false;
+    }
+    
+    return true;
+}
+*/
 
 bool SDManager::exists(const char* path) {
     return SD.exists(path);
@@ -132,13 +164,13 @@ void SDManager::printFileToSerial(const char* path) {
     f.close();
 }
 
-
+// tener cuidado con este 
 bool SDManager::openFile(const char* path){
     _currentFile = SD.open(path, FILE_READ);
     return _currentFile;
 }
 
-
+// tener cuidado con este 
 bool SDManager::getNextLineInRange(uint16_t start_addr, uint16_t size, char* buffer, size_t buffer_size) {
     if (!_currentFile || !_currentFile.available()) return false;
 

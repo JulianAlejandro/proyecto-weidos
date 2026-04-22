@@ -9,13 +9,23 @@ EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager) {
 }
 
 int EnergyMeterRegInterpreter::begin(){
+   // analizar si el SD ya esta iniciado 
+
+    if (!_sd->isReady()) { 
+        Serial.println("Datalogger: SDManager no está listo aún.");
+        return false;
+    }
+    return true;
+
+   /*
     if (!_sd->begin()) {
         Serial.println(F("Error: No se pudo iniciar la SD desde EnergyMeterRegInterpreter"));
         return false;
     }
+    */
 }
 
-EM_request EnergyMeterRegInterpreter::startRequest(const uint16_t start_addr, const uint16_t size) {
+EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
     EM_request result; 
     result.start_addr = start_addr; 
     result.size = 0; 
@@ -68,102 +78,10 @@ EM_request EnergyMeterRegInterpreter::startRequest(const uint16_t start_addr, co
     _lastSizeReadRequestSended = total_req_size; 
     return result; 
 }
-/*
-EM_request EnergyMeterRegInterpreter::startRequest (const long start_addr, const long size){
 
-    EM_request result; 
-    result.start_addr = start_addr; 
-    result.size = 0; 
 
-    if (size > MAX_MODBUS_REGS) return result; // TODO: De momento esta clase solo funciona para modbus
 
-    String _setupFile = "/example2.txt"; // TODO: El nombre de este fichero tiene que entrar en algun sitio externo 
-    char lineBuffer[128];
-    long total_req_size; 
-
-    if (_sd->openFile(_setupFile.c_str())) { // de cada linea almacenamos alguna informacion adicional
-    // Leemos líneas dentro del rango de IDs solicitado
-    int i = 0; 
-    while (_sd->getNextLineInRange(start_addr, size, lineBuffer, sizeof(lineBuffer))) {
-        reg_EM_750 aux;
-            
-        if (splitString(lineBuffer, ';', aux)) { // devuelve true si ha extraido exactamente NUM_COL_REG_EM750 Columnas
-            // Convertimos el String de la columna FORMAT a nuestro Enum
-            coded_format formatEnum = stringToFormat(aux.data[FORMAT]);
-            
-            // Solo lo añadimos si es un formato válidoc:\Users\wm04082\Documents\Arduino\modbus_SD_energi_meter\src\SDManager.h
-            if (formatEnum != FORMAT_UNKNOWN) {
-
-                total_req_size = total_req_size + getFormatSize(formatEnum);
-                _formatBuffer[i] = formatEnum; 
-                i++; 
-
-            }else{
-                // error en la solicitud.... se solicita 0
-                result.start_addr = start_addr; 
-                result.size = 0; 
-                //limpiamos el buffer por si acaso para que se note que algo ha ido mal
-                _lastReadSize = 0; 
-                return result
-            }
-        }else{
-            result.start_addr = start_addr; 
-            result.size = 0; 
-            //limpiamos el buffer por si acaso para que se note que algo ha ido mal
-            _lastReadSize = 0; 
-            return result
-        }
-            
-            // Seguridad: Si ya tenemos suficientes, paramos
-           // if (result.size() >= size) break;
-        }
-        _sd->closeFile();
-    }
-
-    _lastReadSize = i; 
-    result.size = total_req_size; 
-
-    return result; 
-}
-*/
-/*
-std::vector<coded_format> EnergyMeterRegInterpreter::devuelveRegData(long start_addr, long size) {
-
-    //std::vector<coded_format> result;
-    
-    // Reservar espacio ayuda a evitar múltiples reasignaciones de memoria en el heap
-    result.reserve(size); 
-
-    //TODO
-    String _setupFile = "/example2.txt"; 
-    char lineBuffer[128];
-
-    if (_sd->openFile(_setupFile.c_str())) {
-        // Leemos líneas dentro del rango de IDs solicitado
-        while (_sd->getNextLineInRange(start_addr, size, lineBuffer, sizeof(lineBuffer))) {
-            reg_EM_750 aux;
-            
-            if (splitString(lineBuffer, ';', aux)) {
-                // Convertimos el String de la columna FORMAT a nuestro Enum
-                coded_format formatEnum = stringToFormat(aux.data[FORMAT]);
-                
-                // Solo lo añadimos si es un formato válido
-                if (formatEnum != FORMAT_UNKNOWN) {
-                    result.push_back(formatEnum);
-                }
-            }
-            
-            // Seguridad: Si ya tenemos suficientes, paramos
-            if (result.size() >= size) break;
-        }
-        _sd->closeFile();
-    }
-    
-    return result; 
-}
-*/
-
-float* EnergyMeterRegInterpreter::getFloatValues(const uint16_t* rawValues, const uint16_t size_rawValues){
+netFloatDataBuffer EnergyMeterRegInterpreter::getFloatValues(const uint16_t* rawValues, const uint16_t size_rawValues){
     
     // este dato COMO MUCHO puede 
     int idx_datos = 0; 
@@ -173,15 +91,16 @@ float* EnergyMeterRegInterpreter::getFloatValues(const uint16_t* rawValues, cons
             if(_SDformatBuffer[i] == FLOAT){
                 uint32_t combinado = ((uint32_t)rawValues[(_SDaddrsBuffer[i] - _SDaddrsBuffer[0])] << 16) | rawValues[(_SDaddrsBuffer[i] - _SDaddrsBuffer[0]) + 1];
                 
-                memcpy(&dataFloat[idx_datos], &combinado, sizeof(dataFloat[idx_datos]));
+                memcpy(&_dataFloat[idx_datos], &combinado, sizeof(_dataFloat[idx_datos]));
                 idx_datos = idx_datos + 1; 
             }
         }
 
     }
     _sizeData = idx_datos; 
-    return dataFloat; 
+    return {_dataFloat, _sizeData}; 
 }
+
 
 //TODO: para poder hacer este splitString se tiene que cumplir con el formato de registro ADDR;FORMAT;RD_WR;UNIT;NOTE; 
 // como minimo NUM_COL_REG_EM750 valores , sino error

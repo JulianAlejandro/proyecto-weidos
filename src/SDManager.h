@@ -13,6 +13,7 @@ private:
     //uint8_t _csPin;
     //bool _initialized;
     File _currentFile; 
+    bool _initialized = false;
 
 public:
     // Constructor
@@ -21,6 +22,8 @@ public:
 
     // Inicialización
     bool begin();
+
+    bool isReady();
 
     // Utilidades de Archivo Genéricas
     //dapertura de archivo para lectura secuencial

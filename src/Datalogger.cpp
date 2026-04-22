@@ -1,3 +1,166 @@
+#include "Datalogger.h"
+
+Datalogger::Datalogger(SDManager* sdManager) {
+    _sd = sdManager;
+    _logFile = "/tabla.txt"; // Valor por defecto
+}
+
+bool Datalogger::begin() {
+
+    // No llamamos a _sd->begin() aquí, solo preguntamos si ya funciona
+    if (!_sd->isReady()) { 
+        Serial.println("Datalogger: SDManager no está listo aún.");
+        return false;
+    }
+    return true;
+
+    /*
+    if (!_sd->begin()) {
+        Serial.println(F("Error: SD no detectada"));
+        return false;
+    }
+    return true;
+    */
+}
+
+void Datalogger::setLogFile(const char* filename) {
+    _logFile = filename;
+}
+
+bool Datalogger::writeHeader(const char** titulos, uint16_t numTitulos) {
+    if (numTitulos == 0) return false;
+
+    String lineaCompleta = "";
+    lineaCompleta.reserve(128); // Reservamos espacio una sola vez para evitar fragmentar
+
+    for (uint16_t i = 0; i < numTitulos; i++) {
+        lineaCompleta += titulos[i];
+        if (i < numTitulos - 1) lineaCompleta += ";";
+    }
+
+    return _sd->appendLine(_logFile.c_str(), lineaCompleta.c_str());
+}
+
+bool Datalogger::writeRow(const uint32_t timestamp, const float* values, uint16_t numValues) {
+    if (numValues == 0) return false;
+
+    // Construimos la línea de datos
+    // Usamos String de forma controlada con reserve
+    String lineaData = "";
+    lineaData.reserve(128); 
+
+    // Añadimos el timestamp al principio
+    lineaData += String(timestamp);
+    lineaData += ";";
+
+    for (uint16_t i = 0; i < numValues; i++) {
+        // Añadimos el float con 2 decimales
+        lineaData += String(values[i], 2);
+        
+        if (i < numValues - 1) {
+            lineaData += ";";
+        }
+    }
+
+    return _sd->appendLine(_logFile.c_str(), lineaData.c_str());
+}
+
+void Datalogger::clearLogFile() {
+    // Implementar en SDManager un método que borre o sobreescriba
+    //_sd->remove(_logFile.c_str());
+    _sd->clearFile(_logFile.c_str());
+}
+
+
+/*
+#include "Datalogger.h"
+
+
+// En EM750_Datalogger.cpp
+Datalogger::Datalogger(SDManager* sdManager) {
+    _sd = sdManager; // Guardamos la dirección de nuestro administrador
+}
+
+// Inicializa la tarjeta SD y verifica si el archivo de configuración existe
+//TODO: Añadir codigo para analizar si existen los ficheros o no etc
+bool Datalogger::begin() {
+    // 1. Intentamos inicializar la SD a través del manager
+    if (!_sd->begin()) {
+        Serial.println(F("Error: No se pudo iniciar la SD desde Datalogger"));
+        return false;
+    }
+
+
+    return true;
+}
+*/
+/*
+  // Escribe la fila de encabezado en el archivo de log limpiando caracteres conflictivos
+void EM750_Datalogger::writeHeader(const std::vector<String>& titulos) {
+    // 1. Construimos la línea completa en un String temporal
+    // Esto es necesario porque appendLine cierra el archivo al terminar
+    String lineaCompleta = "";
+
+    for (size_t i = 0; i < titulos.size(); i++) {
+        String temp = titulos[i];
+        
+        // Limpieza: Evitar que un ';' rompa el formato CSV
+        temp.replace(';', ','); 
+        
+        lineaCompleta += temp;
+        
+        // Añadir separador si no es el último elemento
+        if (i < titulos.size() - 1) {
+            lineaCompleta += ";";
+        }
+    }
+
+    // 2. Usamos el SDManager para guardar la línea completa
+    if (_sd->appendLine(_logFile.c_str(), lineaCompleta.c_str())) {
+        Serial.println(F("Títulos guardados correctamente via SDManager."));
+    } else {
+        Serial.println(F("Error: SDManager no pudo escribir los títulos."));
+    }
+}
+*/
+
+/*
+// Añade una nueva fila de datos al archivo de log (formato CSV)
+void EM750_Datalogger::writeRow(const std::vector<String>& datos) {
+    // 1. Construimos la línea completa en una variable temporal
+    String lineaAscribir = "";
+
+    for (size_t i = 0; i < datos.size(); i++) {
+        // Limpieza: Reemplazamos ';' por ',' para no romper el formato CSV
+        String temp = datos[i];
+        temp.replace(';', ',');
+        
+        lineaAscribir += temp;
+
+        // Añadimos el separador ';' si no es el último elemento
+        if (i < datos.size() - 1) {
+            lineaAscribir += ";";
+        }
+    }
+
+    // 2. Delegamos la escritura al Manager
+    // Usamos c_str() para pasar de String a const char* que es lo que pide el Manager
+    if (!_sd->appendLine(_logFile.c_str(), lineaAscribir.c_str())) {
+        Serial.println(F("Error: No se pudo escribir la fila en el Log via SDManager."));
+    }
+}
+   */ 
+
+    // Lee todo el contenido del archivo de log y lo vuelca por el puerto serie
+void Datalogger::printLogToSerial() {
+    Serial.print(F("--- Contenido del Log: "));
+    Serial.print(_logFile);
+    Serial.println(F(" ---"));
+
+    _sd->printFileToSerial(_logFile.c_str());
+}
+
+
 /*
 #include "EM_750_Datalogger.h"
 
