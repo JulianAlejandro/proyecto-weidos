@@ -1,13 +1,14 @@
+
 //#include <SD.h>
 //#include "f_map_register_sd.h"
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
 #include <RTClib.h>
 //#include "EM_750_Datalogger.h"
-#include "EnergyMeter750.h"
-#include "SDManager.h"
+#include "src/EnergyMeter/EnergyMeter750.h"
+#include "src/SDManager.h"
 
-#include "SDRegisterMap.h"
+#include "src/EnergyMeter/EnergyMeterRegInterpreter.h"
 
 //#include <ArduinoRS485.h>
 //#include <String>
@@ -23,10 +24,10 @@ RTC_DS3231 rtc;
 
 //---Objetos de Gestion 
 SDManager sd;
-SDRegisterMap RegMap(&sd);
+EnergyMeterRegInterpreter regInterpreter(&sd);
 
 //EM750_Datalogger data_logger(&sd,"/example2.txt", "/tabla.txt");  
-EnergyMeter750 energy_meter(1); // ID de esclavo 1
+EnergyMeter750 energy_meter(1); // ID de esclavo 1c:\Users\wm04082\Documents\Arduino\modbus_SD_energi_meter\src\EnergyMeter\EnergyMeter750.cpp
 
 //----codigo a revisar 
 #define SLAVE_ADDRESS 1 // A eliminar posiblemente 
@@ -57,18 +58,13 @@ void setup() {
   
   Serial.begin(115200);
  
-  if(!RegMap.begin()){
+  if(!regInterpreter.begin()){
       Serial.print("malas noticias");
   }
   
- 
   if (! rtc.begin()) { // todo while(1) bloquea al micro, cambiar
   while (1) printErrorNoRTC(); 
   }
-
-//iniciamos el objeto de energy_meter 
-//necesita de SD manager para leer los registros de de setup y leer correctamente los registros con modbus
-// necesita modbus para leer los registros. 
 
   if(!energy_meter.begin(&modbusTCPClient)){ // se le pasa el tipo de conexion y acceso a funciones de la SD 
     Serial.println("error al iniciar el energy meter");
@@ -87,8 +83,6 @@ void setup() {
 
 void loop() {
 
-  
-
   unsigned long actualMillis = millis();
 
     if (actualMillis - anteriorMillisModbus >= intervaloModbus) {
@@ -106,16 +100,19 @@ void loop() {
 
 void ejecutarLecturaModbus() {
 
-  
-
   Serial.println("--- Iniciando Captura de Datos ---");
 
 
-  energy_meter.readAndProcess_2(19000, 120, &RegMap, procesarRegistroIndividual); // TODO cambiar lo de los rangos 
-    // 4. FINALIZAR SESIÓN (Escribe el salto de línea \n y cierra el archivo)
-    //data_logger.endRowSession();
+  EM_request req = regInterpreter.startRequest(19000, 1);
+  energy_meter.readRegisters(req);
 
-  Serial.println("--- Fila guardada en SD (Sin usar vectores en RAM) ---");
+  uint16_t* datos_brutos = energy_meter.getData();
+  uint16_t cantidad_datos_brutos = energy_meter.getLastSize(); 
+
+  float* datos_float = regInterpreter.getFloatValues(datos_brutos, cantidad_datos_brutos);
+  uint16_t cantidad_datos_float = regInterpreter.getSizeData();
+
+  Serial.println("final");
 
 }
 

@@ -19,12 +19,12 @@ bool SDManager::begin() {
         return false;
     }
     return true; 
+
     /*if (_initialized) return true;
     _initialized = SD.begin(_csPin);
     return _initialized;*/
     
 }
-
 
 bool SDManager::exists(const char* path) {
     return SD.exists(path);
@@ -138,6 +138,42 @@ bool SDManager::openFile(const char* path){
     return _currentFile;
 }
 
+
+bool SDManager::getNextLineInRange(uint16_t start_addr, uint16_t size, char* buffer, size_t buffer_size) {
+    if (!_currentFile || !_currentFile.available()) return false;
+
+    // Calculamos el límite superior (20,000 + 125 no desbordará un uint16_t)
+    uint16_t end_addr = start_addr + size;
+
+    while (_currentFile.available()) {
+        // Leemos la línea hasta el salto de línea
+        int bytesRead = _currentFile.readBytesUntil('\n', buffer, buffer_size - 1);
+        buffer[bytesRead] = '\0';
+
+        // Si la línea está vacía (solo un \n), saltamos a la siguiente
+        if (bytesRead == 0) continue;
+
+        // Buscamos el delimitador ';' para extraer la dirección (ID)
+        char* sepIdx = strchr(buffer, ';');
+        if (sepIdx != nullptr) {
+            char originalChar = *sepIdx;
+            *sepIdx = '\0'; // Truncamos temporalmente para la conversión
+            
+            // Convertimos a entero sin signo de 16 bits
+            // strtoul es más seguro que atoi para uint16_t
+            uint16_t idFound = (uint16_t)strtoul(buffer, NULL, 10);
+            
+            *sepIdx = originalChar; // Restauramos el carácter original
+
+            // Comparamos el ID encontrado con el rango definido
+            if (idFound >= start_addr && idFound < end_addr) {
+                return true; 
+            }
+        }
+    }
+    return false; 
+}
+/*
 bool SDManager::getNextLineInRange(long start_addr, long size, char* buffer, size_t buffer_size) {
     if (!_currentFile || !_currentFile.available()) return false;
 
@@ -168,6 +204,7 @@ bool SDManager::getNextLineInRange(long start_addr, long size, char* buffer, siz
     }
     return false; 
 }
+*/
 
 void SDManager::closeFile(){
     if (_currentFile) _currentFile.close();
