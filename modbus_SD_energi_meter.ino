@@ -1,3 +1,33 @@
+
+/*
+#include "src/SDManager.h"
+#include <RTClib.h>
+
+//---Objetos de Gestion 
+SDManager sd;
+RTC_DS3231 rtc;
+
+void setup() {
+
+Serial.begin(115200);
+
+    if (sd.begin()) {
+        if (sd.createFile("datos.csv")) {
+            Serial.println(F("Archivo listo para usarse."));
+        } else {
+            Serial.println(F("Error al crear el archivo."));
+        }
+    }
+
+}
+
+void loop() {
+    
+}
+
+*/
+
+
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
 #include <RTClib.h>
@@ -110,8 +140,7 @@ void loop() {
 
 
 void ejecutarLecturaModbus() {
-
-    
+   
     if (energy_meter.executeRequest(req)) {
         RegDataBuffer raw = energy_meter.readDataBuffer();
         netFloatDataBuffer res = regInterpreter.getFloatValues(raw.buffer, raw.size);
@@ -136,36 +165,6 @@ void ejecutarLecturaModbus() {
     }
 }
 
-/*
-void ejecutarLecturaModbus() {
-  
-    
-//energy_meter.readData(19000);
-
-    EM_request req = regInterpreter.startNewRequest(19000, 5);
-  
-    if (energy_meter.executeRequest(req)) {
-        
-        // Obtenemos todo en un solo objeto
-        RegDataBuffer raw = energy_meter.readDataBuffer();
-
-        // Pasamos el objeto a la siguiente etapa
-        netFloatDataBuffer res = regInterpreter.getFloatValues(raw.buffer, raw.size);
-
-        DateTime now = rtc.now();
-
-        char buffer[20];
-        sprintf(buffer, "%04d-%02d-%02d %02d:%02d:%02d", 
-        now.year(), now.month(), now.day(), 
-        now.hour(), now.minute(), now.second());
-
-        if(! datalogger.writeRow(, res.buffer, res.size)){
-          Serial.println("Error escribiendo un nuevo dato en el data_logger");
-        } 
-
-    }
-}
-*/
 unsigned long prevTime = 0;
 void printErrorNoRTC(){
   if(millis()-prevTime>3000){

@@ -38,6 +38,25 @@ bool SDManager::begin() {
 
 */
 
+bool SDManager::createFile(const char* path) {
+    // Si el archivo ya existe, no hacemos nada y retornamos true
+    if (SD.exists(path)) {
+        return true; 
+    }
+
+    // Intentamos abrirlo en modo escritura con creación (O_CREAT)
+    // Al cerrarlo inmediatamente, queda creado como un archivo vacío de 0 bytes
+    File f = SD.open(path, FILE_WRITE);
+    if (f) {
+        f.close();
+        return true;
+    }
+
+    return false; // Error al crear (ej: tarjeta llena o nombre inválido)
+}
+
+
+
 bool SDManager::isReady() {
     return _initialized;
 }
@@ -118,7 +137,7 @@ bool SDManager::getLineByID(const char* path, const char* id, char* destBuffer, 
     return false; // No se encontró el ID
 }
 
-void SDManager::getLinesByRange(const char* path, long start, long end, LineCallback callback) {
+void SDManager::getLinesByRange(const char* path, uint16_t start, uint16_t end, LineCallback callback) {
     File file = SD.open(path, FILE_READ);
     if (!file) {
         Serial.println(F("Error: No se pudo abrir archivo para rango"));
@@ -170,7 +189,19 @@ bool SDManager::openFile(const char* path){
     return _currentFile;
 }
 
-// tener cuidado con este 
+bool SDManager::createDirectory(const char* path) {
+    if (!_initialized) return false;
+
+    // SD.exists() funciona tanto para archivos como para directorios
+    if (SD.exists(path)) {
+        return true; 
+    }
+
+    // SD.mkdir devuelve true si tuvo éxito
+    return SD.mkdir(path);
+}
+
+// TODO esta funcion no debe estar aqui, esta funcionalidad pertenece a EnergyMeter Map Register , tambien hay otras 
 bool SDManager::getNextLineInRange(uint16_t start_addr, uint16_t size, char* buffer, size_t buffer_size) {
     if (!_currentFile || !_currentFile.available()) return false;
 
@@ -205,38 +236,7 @@ bool SDManager::getNextLineInRange(uint16_t start_addr, uint16_t size, char* buf
     }
     return false; 
 }
-/*
-bool SDManager::getNextLineInRange(long start_addr, long size, char* buffer, size_t buffer_size) {
-    if (!_currentFile || !_currentFile.available()) return false;
 
-    // Calculamos el límite superior basado en el tamaño solicitado
-    long end_addr = start_addr + size;
-
-    while (_currentFile.available()) {
-        // Leemos la línea hasta el salto de línea
-        int bytesRead = _currentFile.readBytesUntil('\n', buffer, buffer_size - 1);
-        buffer[bytesRead] = '\0';
-
-        // Si la línea está vacía (solo un \n), saltamos a la siguiente
-        if (bytesRead == 0) continue;
-
-        // Buscamos el delimitador ';' para extraer el ID
-        char* sepIdx = strchr(buffer, ';');
-        if (sepIdx != nullptr) {
-            char originalChar = *sepIdx;
-            *sepIdx = '\0'; // Truncamos temporalmente para usar atol
-            long idFound = atol(buffer);
-            *sepIdx = originalChar; // Restauramos el carácter original
-
-            // Comparamos el ID encontrado con el nuevo rango definido
-            if (idFound >= start_addr && idFound <= end_addr) {
-                return true; 
-            }
-        }
-    }
-    return false; 
-}
-*/
 
 void SDManager::closeFile(){
     if (_currentFile) _currentFile.close();
