@@ -13,13 +13,18 @@ struct EM_request {
     uint16_t size; 
 };
 
-struct reg_EM_750 {
+struct reg_EM_750 { 
     String data[NUM_COL_REG_EM750];
 };
 
 struct netFloatDataBuffer {
     float* buffer;  // Puntero a los datos
     uint16_t size;    // Cantidad de registros leídos
+};
+
+struct titlesBuffer {
+    const char** buffer;
+    uint16_t size;
 };
 
 enum index_reg_EM750 { ADDR, FORMAT, RD_WR, UNIT, NOTE };
@@ -33,14 +38,19 @@ class EnergyMeterRegInterpreter {
 private:
     SDManager* _sd = nullptr; 
 
+//variables de apoyo a la lectura de la SD
     uint16_t _SDaddrsBuffer[MAX_MODBUS_REGS];
     coded_format _SDformatBuffer[MAX_MODBUS_REGS];
+
+    String _titulosPersistentes[MAX_MODBUS_REGS];
+    const char* _titulosBuffer[MAX_MODBUS_REGS]; // estructura de tamaño MAX_MODBUS_REGS
+
     uint16_t _SDlastRowReadSize;
 
     uint16_t _lastSizeReadRequestSended; 
 
     float _dataFloat[MAX_MODBUS_REGS];
-    uint16_t _sizeData; 
+    uint16_t _sizeData;
 
     bool splitString(const char* linea, char div_char, reg_EM_750 &resultado);
     int getFormatSize(coded_format f);
@@ -55,6 +65,7 @@ public:
 
     netFloatDataBuffer getFloatValues(const uint16_t* datos, const uint16_t size);
 
+    titlesBuffer getTitles() { return { _titulosBuffer, _SDlastRowReadSize };}
 
     // Función auxiliar para convertir String a Enum
     static coded_format stringToFormat(const String& str) {

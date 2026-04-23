@@ -41,6 +41,28 @@ bool Datalogger::writeHeader(const char** titulos, uint16_t numTitulos) {
     return _sd->appendLine(_logFile.c_str(), lineaCompleta.c_str());
 }
 
+
+bool Datalogger::writeRow(const char* timestamp, const float* values, uint16_t numValues) {
+    if (numValues == 0) return false;
+
+    String lineaData = "";
+    lineaData.reserve(128); 
+
+    // Añadimos el string del timestamp (ej: "2026-04-23 09:00:00")
+    lineaData += timestamp;
+    lineaData += ";";
+
+    for (uint16_t i = 0; i < numValues; i++) {
+        lineaData += String(values[i], 2);
+        if (i < numValues - 1) {
+            lineaData += ";";
+        }
+    }
+
+    return _sd->appendLine(_logFile.c_str(), lineaData.c_str());
+}
+
+/*
 bool Datalogger::writeRow(const uint32_t timestamp, const float* values, uint16_t numValues) {
     if (numValues == 0) return false;
 
@@ -64,6 +86,8 @@ bool Datalogger::writeRow(const uint32_t timestamp, const float* values, uint16_
 
     return _sd->appendLine(_logFile.c_str(), lineaData.c_str());
 }
+
+*/
 
 void Datalogger::clearLogFile() {
     // Implementar en SDManager un método que borre o sobreescriba

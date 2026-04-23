@@ -25,21 +25,21 @@ int EnergyMeterRegInterpreter::begin(){
     */
 }
 
+//TODO mejorar esta funcion, hay long y mas cosas hardcodeadas y sin sentidos 
 EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
     EM_request result; 
     result.start_addr = start_addr; 
     result.size = 0; 
-
     _lastSizeReadRequestSended = 0; 
     
-    // 1. IMPORTANTE: Inicializar variables locales
-    long total_req_size = 0; 
+    // 1. IMPORTANTE: Inicializar variables locales 
     int i = 0; 
+    long total_req_size = 0;
 
     if (size > MAX_MODBUS_REGS) return result; 
 
-    String _setupFile = "/example2.txt"; 
-    char lineBuffer[128];
+    String _setupFile = "/example2.txt";  // TODO , modificar donde esta esto
+    char lineBuffer[128]; 
 
     if (_sd->openFile(_setupFile.c_str())) {
         // 2. Añadimos i < MAX_MODBUS_REGS por seguridad de memoria
@@ -53,12 +53,17 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
                     total_req_size += getFormatSize(formatEnum);
                     _SDformatBuffer[i] = formatEnum; 
                     _SDaddrsBuffer[i] = aux.data[ADDR].toInt();
+                    //aux.data[NOTE]// Actualizar el buffer de titulos tambien (en NOTE estan los titulos)
+
+                    //Actualizacion de titulos 
+                    _titulosPersistentes[i] = aux.data[NOTE];
+                    _titulosBuffer[i] = _titulosPersistentes[i].c_str();
                     i++; 
                 } else {
                     // Si un formato es desconocido, abortamos por seguridad
                     _sd->closeFile(); // No olvides cerrar el archivo antes de salir
-                    _SDlastRowReadSize = 0; 
-                    result.size = 0;
+                    _SDlastRowReadSize = 0;  // TODO. pensar
+                    result.size = 0; // TODO. pensar
                     return result; // Faltaba ;
                 }
             } else {

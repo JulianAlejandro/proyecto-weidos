@@ -23,8 +23,9 @@ public:
     // Escribe una fila de datos numéricos
     // values: el array de floats que viene del Interpreter
     // numValues: cantidad de datos
-    bool writeRow(const uint32_t timestamp, const float* values, uint16_t numValues); 
-    
+    // Cambia esto en el .h
+    bool writeRow(const char* timestamp, const float* values, uint16_t numValues);
+
     void clearLogFile();
     void printLogToSerial();
 };

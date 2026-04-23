@@ -21,14 +21,16 @@ RTC_DS3231 rtc;
 SDManager sd;
 Datalogger datalogger(&sd);
 EnergyMeterRegInterpreter regInterpreter(&sd);
-EnergyMeter750 energy_meter(1); // ID de esclavo 1
+EnergyMeter750 energy_meter(1); // TODO ID ES DE MODBUS MAL 
 
 //----codigo a revisar 
 #define SLAVE_ADDRESS 1 // A eliminar posiblemente 
 
 unsigned long anteriorMillisModbus = 0; // Almacena la última vez que leíste
 const long intervaloModbus = 5000;      // Intervalo de 5 segundos
-long contadorPrueba = 0;                // El contador que quieres incrementar
+long contadorPrueba = 0;   
+
+EM_request req;              // El contador que quieres incrementar
 
 void printErrorNoRTC();
 void ejecutarLecturaModbus();
@@ -58,6 +60,7 @@ void setup() {
     Serial.println("error al iniciar el energy meter");
   }
 
+
   Ethernet.init(ETHERNET_CS);
   if (Ethernet.linkStatus() == LinkOFF) Serial.println("Ethernet Cable is not connected");
   
@@ -65,10 +68,30 @@ void setup() {
 
   delay(5000);
 
-  Serial.print("Empieza el loop");
+  req = regInterpreter.startNewRequest(19000, 10);
+  titlesBuffer misTitulos =  regInterpreter.getTitles();
+
+  // 2. Creamos un nuevo buffer temporal con espacio para el Timestamp (+1)
+  uint16_t totalTitulos = misTitulos.size + 1;
+  const char* cabeceraCompleta[totalTitulos];
+
+  cabeceraCompleta[0] = "Timestamp";
+
+  for (uint16_t i = 0; i < misTitulos.size; i++) {
+    cabeceraCompleta[i + 1] = misTitulos.buffer[i];
+  }
+
+  datalogger.clearLogFile();
+  if(!datalogger.writeHeader(cabeceraCompleta, totalTitulos)){
+    Serial.println("error al poner los titulos");
+  }
+
+Serial.print("Empieza el loop");
 }
 
 void loop() {
+
+  
 
   unsigned long actualMillis = millis();
 
@@ -82,11 +105,45 @@ void loop() {
             ejecutarLecturaModbus();
         }
     }
+    
 }
 
+
 void ejecutarLecturaModbus() {
-    EM_request req = regInterpreter.startNewRequest(19000, 10);
+
     
+    if (energy_meter.executeRequest(req)) {
+        RegDataBuffer raw = energy_meter.readDataBuffer();
+        netFloatDataBuffer res = regInterpreter.getFloatValues(raw.buffer, raw.size);
+
+        DateTime now = rtc.now();
+
+        // Creamos el string con el formato deseado
+        char buffer[20];
+        sprintf(buffer, "%04d-%02d-%02d %02d:%02d:%02d", 
+                now.year(), now.month(), now.day(), 
+                now.hour(), now.minute(), now.second());
+
+        // LLAMADA CORREGIDA: Pasamos el buffer de texto y los floats
+        if(!datalogger.writeRow(buffer, res.buffer, res.size)){
+            Serial.println("Error escribiendo un nuevo dato en el data_logger");
+        } 
+
+        datalogger.printLogToSerial();
+    }else{
+
+      Serial.println("creo que salta el error aqui");
+    }
+}
+
+/*
+void ejecutarLecturaModbus() {
+  
+    
+//energy_meter.readData(19000);
+
+    EM_request req = regInterpreter.startNewRequest(19000, 5);
+  
     if (energy_meter.executeRequest(req)) {
         
         // Obtenemos todo en un solo objeto
@@ -95,12 +152,20 @@ void ejecutarLecturaModbus() {
         // Pasamos el objeto a la siguiente etapa
         netFloatDataBuffer res = regInterpreter.getFloatValues(raw.buffer, raw.size);
 
-        for (int i = 0; i < res.size; i++) {
-            Serial.printf("Valor: %.2f\n", res.buffer[i]);
-        }
+        DateTime now = rtc.now();
+
+        char buffer[20];
+        sprintf(buffer, "%04d-%02d-%02d %02d:%02d:%02d", 
+        now.year(), now.month(), now.day(), 
+        now.hour(), now.minute(), now.second());
+
+        if(! datalogger.writeRow(, res.buffer, res.size)){
+          Serial.println("Error escribiendo un nuevo dato en el data_logger");
+        } 
+
     }
 }
-
+*/
 unsigned long prevTime = 0;
 void printErrorNoRTC(){
   if(millis()-prevTime>3000){
