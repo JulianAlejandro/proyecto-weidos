@@ -30,25 +30,24 @@ public:
     bool createFile(const char* path);
     bool createDirectory(const char* path);
 
-    bool openFile(const char* path); // No gusta que esta funcion sea publica
-
-    //tTODO: esta funcion se puede basar en una mas generica
-    bool getNextLineInRange (uint16_t start, uint16_t size, char* buffer, size_t buffer_size); 
-    void closeFile(); // no gusta que esta funcion sea publica
 
     bool exists(const char* path);
     //bool remove(const char* path);
     void clearFile(const char* path);
 
-    // Nueva versión con Callback: No devuelve nada, solo "notifica" cuando encuentra una línea
-    //TODO ESTO NO VA A QUI
-    void getLinesByRange(const char* path, uint16_t start, uint16_t end, LineCallback callback);
-    
-    // Escritura Optimizada
-    //TODO esto no va aqui
-    bool getLineByID(const char* path, const char* id, char* destBuffer, size_t bufferSize);
     bool appendLine(const char* path, const char* data);
+
+    //TODO: DEBUG envia por serial todo lo que hay dentro del fichero seleccionado
     void printFileToSerial(const char* path);
+
+    // TODO quitar de aqui 
+    bool openFile(const char* path); // No gusta que esta funcion sea publica
+    bool getNextLineInRange (uint16_t start, uint16_t size, char* buffer, size_t buffer_size); 
+    void closeFile(); // no gusta que esta funcion sea publica
+
+    void getLinesByRange(const char* path, uint16_t start, uint16_t end, LineCallback callback);
+    bool getLineByID(const char* path, const char* id, char* destBuffer, size_t bufferSize);
+
 };
 
 #endif

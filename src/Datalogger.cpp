@@ -6,29 +6,26 @@ Datalogger::Datalogger(SDManager* sdManager) : _sd(sdManager), _fileCount(0) {
 }
 
 bool Datalogger::begin() {
-    // 1. Verificar que el hardware SD esté listo
     if (!_sd->isReady()) {
         Serial.println(F("Datalogger: SDManager no detectado."));
         return false;
     }
 
-    // 2. Asegurar que exista el directorio /LOGS
-    // Usamos el manager para crearlo
-    if (!_sd->createDirectory("/LOGS")) {
-        Serial.println(F("Datalogger: Error al crear el directorio /LOGS"));
+    // 1. Usar el define para crear el directorio
+    if (!_sd->createDirectory(DIR_LOG_NAME)) {
+        Serial.print(F("Datalogger: Error al crear "));
+        Serial.println(F(DIR_LOG_NAME));
         return false;
     }
 
-    // 3. Escanear archivos existentes (la función que hicimos antes)
     scanExistingLogs();
 
-    // 4. Si el almacén está vacío, crear el primer log por defecto
     if (_fileCount == 0) {
-        if (!addAndSetLogFile("/LOGS/log.txt")) {
+        // 2. Usar la nueva función para el log por defecto
+        if (!newLog("log.txt")) {
             return false;
         }
     } else {
-        // Si ya había archivos, seleccionamos el último
         selectLogByIndex(_fileCount - 1);
     }
 
@@ -36,7 +33,8 @@ bool Datalogger::begin() {
 }
 
 void Datalogger::scanExistingLogs() {
-    File root = SD.open("/LOGS"); // Abrimos la carpeta específica
+    // 3. Abrir el directorio usando el define
+    File root = SD.open(DIR_LOG_NAME); 
     if (!root || !root.isDirectory()) return;
 
     _fileCount = 0;
@@ -49,9 +47,8 @@ void Datalogger::scanExistingLogs() {
             const char* name = entry.name();
             
             if (hasLogExtension(name) && _fileCount < MAX_LOG_FILES) {
-                // IMPORTANTE: Construimos la ruta completa manualmente
-                // para que _filenames guarde "/LOGS/nombre.log"
-                snprintf(_filenames[_fileCount], FILE_NAME_SIZE, "/LOGS/%s", name);
+                // 4. Construir ruta completa usando el define
+                snprintf(_filenames[_fileCount], FILE_NAME_SIZE, "%s/%s", DIR_LOG_NAME, name);
                 _fileCount++;
             }
         }
@@ -69,19 +66,62 @@ bool Datalogger::hasLogExtension(const char* filename) {
     return (strcasecmp(ext, ".log") == 0 || strcasecmp(ext, ".txt") == 0);
 }
 
+// Nueva función solicitada
+bool Datalogger::newLog(const char* name) {
+    char fullPath[FILE_NAME_SIZE];
+    
+    // Concatenamos el directorio y el nombre: "/LOGS/nombre"
+    // El formato "%s/%s" asegura que haya una barra entre el dir y el archivo
+    snprintf(fullPath, sizeof(fullPath), "%s/%s", DIR_LOG_NAME, name);
+    
+    return addAndSetLogFile(fullPath);
+}
+
 bool Datalogger::addAndSetLogFile(const char* filename) {
     if (_fileCount >= MAX_LOG_FILES) return false;
-    if (strlen(filename) >= FILE_NAME_SIZE) return false; 
 
-    // Guardar en nuestro almacén
-    strncpy(_filenames[_fileCount], filename, FILE_NAME_SIZE - 1);
+    char baseName[FILE_NAME_SIZE];
+    char extension[10];
+    char finalPath[FILE_NAME_SIZE];
+    
+    // 1. Separar el nombre base de la extensión (ej: "/LOGS/log" y ".txt")
+    const char *dot = strrchr(filename, '.');
+    if (dot) {
+        size_t baseLen = dot - filename;
+        strncpy(baseName, filename, baseLen);
+        baseName[baseLen] = '\0';
+        strncpy(extension, dot, sizeof(extension) - 1);
+        extension[sizeof(extension) - 1] = '\0';
+    } else {
+        strncpy(baseName, filename, sizeof(baseName) - 1);
+        baseName[sizeof(baseName) - 1] = '\0';
+        extension[0] = '\0';
+    }
+
+    // 2. Buscar un nombre que no exista
+    uint16_t counter = 0;
+    strncpy(finalPath, filename, FILE_NAME_SIZE - 1);
+
+    while (_sd->exists(finalPath)) {
+        counter++;
+        // Crea un nombre tipo "/LOGS/log_1.txt", "/LOGS/log_2.txt", etc.
+        snprintf(finalPath, FILE_NAME_SIZE, "%s_%u%s", baseName, counter, extension);
+        
+        // Seguridad para no entrar en bucle infinito si algo falla
+        if (counter > 999) break; 
+    }
+
+    // 3. Guardar el nombre final en nuestro almacén
+    strncpy(_filenames[_fileCount], finalPath, FILE_NAME_SIZE - 1);
     _filenames[_fileCount][FILE_NAME_SIZE - 1] = '\0';
     
     // Establecer como archivo actual
     strncpy(_currentLogFile, _filenames[_fileCount], FILE_NAME_SIZE - 1);
     
     _fileCount++;
-    return true;
+    
+    // Opcional: Crear el archivo físicamente ahora para "reservarlo"
+    return _sd->createFile(_currentLogFile);
 }
 
 void Datalogger::selectLogByIndex(uint16_t index) {

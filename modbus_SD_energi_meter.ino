@@ -1,32 +1,89 @@
-
-/*
+#include "src/Datalogger.h"
 #include "src/SDManager.h"
-#include <RTClib.h>
+#include <RTClib.h> // Asegúrate de incluir la librería del RTC
 
-//---Objetos de Gestion 
-SDManager sd;
+// Instancias globales
+SDManager sdManager;
+Datalogger logger(&sdManager);
 RTC_DS3231 rtc;
 
+// Configuración de los datos a loguear
+const char* cabeceras[] = {"Voltaje", "Corriente", "Potencia"};
+const uint16_t numCampos = 3;
+
 void setup() {
+    Serial.begin(115200);
+    while (!Serial) delay(10); 
 
-Serial.begin(115200);
+    Serial.println(F("\n--- TEST DATALOGGER CON FECHA ---"));
 
-    if (sd.begin()) {
-        if (sd.createFile("datos.csv")) {
-            Serial.println(F("Archivo listo para usarse."));
-        } else {
-            Serial.println(F("Error al crear el archivo."));
-        }
+    // 1. Inicializar SD
+    if (!sdManager.begin()) {
+        Serial.println(F("Error: No se pudo inicializar la SD."));
+        while (1); 
     }
 
+    // 2. Inicializar Datalogger
+    if (!logger.begin()) {
+        Serial.println(F("Error: No se pudo inicializar el Datalogger."));
+        while (1);
+    }
+
+    // 3. Inicializar RTC
+    if (!rtc.begin()) {
+        Serial.println(F("Error: No se detectó el RTC."));
+        // Aquí podrías decidir si continuar con un nombre genérico o bloquear
+    }
+
+    // 4. Generar el nombre del archivo basado en la fecha
+    DateTime now = rtc.now();
+    char nombre[32]; // Buffer para la ruta completa
+    
+
+    // Formato: /LOGS/260424.txt (6 caracteres, dentro del límite)
+    snprintf(nombre, sizeof(nombre), "%02d%02d%02d.txt", 
+      now.year() % 100, now.month(), now.day());
+
+    Serial.print(F("Intentando crear archivo: "));
+    Serial.println(nombre);
+
+    // 5. Usar addAndSetLogFile con el nuevo nombre
+    // Gracias a tu lógica interna, si el archivo de hoy ya existe, creará L20260424_1.txt
+    if (logger.newLog(nombre)) {
+        Serial.println(F("Archivo configurado correctamente."));
+    } else {
+        Serial.println(F("Error al crear el archivo de log."));
+    }
+
+    // 6. Escribir la cabecera
+    if (logger.writeHeader(cabeceras, numCampos)) {
+        Serial.println(F("Cabecera escrita."));
+    }
+
+    // 7. Simular datos
+    Serial.println(F("--- Escribiendo datos de prueba ---"));
+    for (int i = 0; i < 5; i++) {
+        char timeStr[10];
+        DateTime tempTime = rtc.now();
+        snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", tempTime.hour(), tempTime.minute(), tempTime.second());
+
+        float datosSimulados[numCampos] = { 220.5, 5.2, 1146.6 };
+
+        logger.writeRow(timeStr, datosSimulados, numCampos);
+        delay(500);
+    }
+
+    // 8. Ver resultado
+    logger.printLogToSerial();
+    Serial.println(F("\n--- PROCESO COMPLETADO ---"));
 }
 
 void loop() {
-    
+
+
 }
 
-*/
-
+/*
 
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
@@ -172,4 +229,4 @@ void printErrorNoRTC(){
     prevTime = millis();
   }    
 }
-
+*/
