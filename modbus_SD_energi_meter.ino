@@ -1,3 +1,4 @@
+/*
 #include "src/Datalogger.h"
 #include "src/SDManager.h"
 #include <RTClib.h> // Asegúrate de incluir la librería del RTC
@@ -80,10 +81,9 @@ void setup() {
 
 void loop() {
 
-
 }
+*/
 
-/*
 
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
@@ -229,4 +229,4 @@ void printErrorNoRTC(){
     prevTime = millis();
   }    
 }
-*/
+

@@ -2,6 +2,11 @@
 #include "EnergyMeterRegInterpreter.h"
 #include <Arduino.h>
 
+struct InterpreterContext {
+    EnergyMeterRegInterpreter* instance;
+    uint16_t start_addr;
+    uint16_t size;
+};
 
 // Constructor: Inicializamos el puntero al manager de la SD
 EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager) {
@@ -25,6 +30,76 @@ int EnergyMeterRegInterpreter::begin(){
     */
 }
 
+void EnergyMeterRegInterpreter::staticCallback(const char* line, void* context) {
+    // Convertimos el puntero genérico de nuevo a nuestro objeto
+    InterpreterContext* ctx = (InterpreterContext*)context;
+
+    // 2. Usamos la instancia para llamar al manejador, pasando los datos extra
+    ctx->instance->handleLine(line, ctx->start_addr, ctx->size);
+}
+
+void EnergyMeterRegInterpreter::handleLine(const char* line, uint16_t start, uint16_t size) {
+    // 1. Verificación básica: Si la línea está vacía o es un comentario (opcional)
+    if (line == nullptr || line[0] == '\0' || !isdigit(line[0])) return;
+
+    reg_EM_750 aux;
+    // 2. Intentar dividir la cadena
+    if (splitString(line, ';', aux)) {
+        uint16_t addr = (uint16_t)aux.data[ADDR].toInt();
+
+        // 3. Filtrar: ¿Está la dirección dentro del rango solicitado?
+        if (addr >= start && addr < (start + size)) {
+            coded_format formatEnum = stringToFormat(aux.data[FORMAT]);
+
+            // 4. Validar formato y espacio en el buffer
+            if (formatEnum != FORMAT_UNKNOWN && _SDlastRowReadSize < MAX_MODBUS_REGS) {
+                int i = _SDlastRowReadSize; // Índice actual
+
+                // Guardamos los metadatos del registro
+                _SDformatBuffer[i] = formatEnum;
+                _SDaddrsBuffer[i] = addr;
+                
+                // Manejo de títulos (String persistente para que el const char* no apunte a basura)
+                _titulosPersistentes[i] = aux.data[NOTE];
+                _titulosBuffer[i] = _titulosPersistentes[i].c_str();
+
+                // Actualizamos el tamaño total de registros Modbus que se pedirán
+                current_request.size += getFormatSize(formatEnum);
+                
+                // Incrementamos el contador de filas válidas encontradas
+                _SDlastRowReadSize++;
+            }
+        }
+    }
+}
+
+EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
+    // 1. Reiniciar estado para la nueva petición
+    current_request.start_addr = start_addr; 
+    current_request.size = 0; 
+    _SDlastRowReadSize = 0; 
+    _lastSizeReadRequestSended = 0;
+
+    if (size > MAX_MODBUS_REGS) return current_request; 
+
+    // 2. Configurar el contexto para el callback
+    String _setupFile = "/example2.txt"; 
+    InterpreterContext ctx; 
+    ctx.instance = this; 
+    ctx.start_addr = start_addr; 
+    ctx.size = size; 
+    
+    // 3. Leer el archivo. El SDManager llamará a staticCallback -> handleLine por cada línea
+    if (_sd->isReady()) {
+        _sd->getAllLines(_setupFile.c_str(), staticCallback, &ctx);
+    }
+
+    // 4. Una vez finalizada la lectura, actualizamos el registro de control
+    _lastSizeReadRequestSended = current_request.size;
+    
+    return current_request; 
+}
+/*
 //TODO mejorar esta funcion, hay long y mas cosas hardcodeadas y sin sentidos 
 EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
     EM_request result; 
@@ -84,7 +159,7 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
     return result; 
 }
 
-
+*/
 
 netFloatDataBuffer EnergyMeterRegInterpreter::getFloatValues(const uint16_t* rawValues, const uint16_t size_rawValues){
     

@@ -37,6 +37,7 @@ class EnergyMeterRegInterpreter {
 
 private:
     SDManager* _sd = nullptr; 
+    EM_request current_request; 
 
 //variables de apoyo a la lectura de la SD
     uint16_t _SDaddrsBuffer[MAX_MODBUS_REGS];
@@ -55,11 +56,17 @@ private:
     bool splitString(const char* linea, char div_char, reg_EM_750 &resultado);
     int getFormatSize(coded_format f);
 
+    void handleLine(const char* line, uint16_t start, uint16_t size);
+    static void staticCallback(const char* line, void* context);
+
 public:
     // Constructor
     EnergyMeterRegInterpreter(SDManager* sdManager);
 
     int begin();
+
+    
+    void processMemoryMap();
 
     EM_request startNewRequest (const uint16_t start_addr, const uint16_t size);
 
