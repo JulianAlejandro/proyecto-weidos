@@ -84,7 +84,6 @@ void loop() {
 }
 */
 
-
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
 #include <RTClib.h>
@@ -119,8 +118,16 @@ long contadorPrueba = 0;
 
 EM_request req;              // El contador que quieres incrementar
 
-void printErrorNoRTC();
-void ejecutarLecturaModbus();
+//uint16_t totalTitulos;
+//const char* cabeceraCompleta[totalTitulos];
+
+bool loop_cada_x_tiempo();
+
+int contador = 0; 
+int contador_nombre = 1; 
+
+String nombre = "nombre";
+
 
 void setup() {
   
@@ -131,7 +138,7 @@ void setup() {
     while(1); //bloqueamos el sistema ya que si no hay SD no se puede hacer nada. 
   }
 
-  if(! datalogger.begin()){
+  if(! datalogger.begin()){ // mira si esta creada el directorio de log si no esta creado , lo crea
     Serial.println("Error en encendido de datalogger");
   }
  
@@ -147,7 +154,6 @@ void setup() {
     Serial.println("error al iniciar el energy meter");
   }
 
-
   Ethernet.init(ETHERNET_CS);
   if (Ethernet.linkStatus() == LinkOFF) Serial.println("Ethernet Cable is not connected");
   
@@ -156,19 +162,21 @@ void setup() {
   delay(5000);
 
   req = regInterpreter.startNewRequest(19000, 10);
-  titlesBuffer misTitulos =  regInterpreter.getTitles();
+  titlesBuffer misTitulos = regInterpreter.getTitles();
+  
+  // creamos la cabecera con titulos y timestamp
 
-  // 2. Creamos un nuevo buffer temporal con espacio para el Timestamp (+1)
-  uint16_t totalTitulos = misTitulos.size + 1;
-  const char* cabeceraCompleta[totalTitulos];
+      // 2. Creamos un nuevo buffer temporal con espacio para el Timestamp (+1)
+      uint16_t totalTitulos = misTitulos.size + 1;
+      const char* cabeceraCompleta[totalTitulos];
 
-  cabeceraCompleta[0] = "Timestamp";
+      cabeceraCompleta[0] = "Timestamp";
 
-  for (uint16_t i = 0; i < misTitulos.size; i++) {
-    cabeceraCompleta[i + 1] = misTitulos.buffer[i];
-  }
-
-  datalogger.clearLogFile();
+      for (uint16_t i = 0; i < misTitulos.size; i++) {
+        cabeceraCompleta[i + 1] = misTitulos.buffer[i];
+      }
+  
+  datalogger.clearLogFile(); // limpia el directorio activo actualmente
   if(!datalogger.writeHeader(cabeceraCompleta, totalTitulos)){
     Serial.println("error al poner los titulos");
   }
@@ -176,57 +184,67 @@ void setup() {
 Serial.print("Empieza el loop");
 }
 
-void loop() {
+bool loop_cada_x_tiempo() {
+    if (contador == 5){
+      contador_nombre = contador_nombre + 1;
+      nombre = nombre + String(contador_nombre) + String(".txt");    
+      datalogger.newLog(nombre.c_str()); // Añadir esta líne
+      nombre = "nombre"; 
+      contador = 0; 
+    }
 
-  
+
+    //contador_nombre = contador_nombre + 1; 
+    
+    contador++; 
+   // if (!energy_meter.executeRequest(req)) {return 0;}
+
+    //  rawDataBuffer raw = energy_meter.readDataBuffer();
+    //  regInterpreter.getDataProcess(raw.buffer, raw.size); 
+    //  stringDataEM res = regInterpreter.getData();
+
+    const char* datosPrueba[] = {
+        "230.5",  // Voltaje
+        "1.25",   // Corriente
+        "285.0",  // Potencia
+        "50.01",  // Frecuencia
+        "0.98"    // Factor de potencia
+    };
+
+      DateTime now = rtc.now();
+
+          // Creamos el string con el formato deseado
+           char buffer[20];
+           sprintf(buffer, "%04d-%02d-%02d %02d:%02d:%02d", 
+            now.year(), now.month(), now.day(), 
+            now.hour(), now.minute(), now.second());
+
+      // LLAMADA CORREGIDA: Pasamos el buffer de texto y los floats
+      if(!datalogger.writeRow(buffer, datosPrueba, 5)){
+        Serial.println("Error escribiendo un nuevo dato en el data_logger");
+      } 
+
+      datalogger.printLogToSerial();
+      
+    return 0; 
+}
+
+void loop() {
 
   unsigned long actualMillis = millis();
 
     if (actualMillis - anteriorMillisModbus >= intervaloModbus) {
         anteriorMillisModbus = actualMillis;
 
-        if (!modbusTCPClient.connected()) {
+       // if (!modbusTCPClient.connected()) {
+        if(false){
             Serial.println("Reconectando Modbus...");
             modbusTCPClient.begin(server, 502);
         } else {
-            ejecutarLecturaModbus();
+           if(!loop_cada_x_tiempo()){
+            //Serial.println("Error loop");
+           }
         }
     }
-    
-}
-
-
-void ejecutarLecturaModbus() {
-   
-    if (energy_meter.executeRequest(req)) {
-        RegDataBuffer raw = energy_meter.readDataBuffer();
-        netFloatDataBuffer res = regInterpreter.getFloatValues(raw.buffer, raw.size);
-
-        DateTime now = rtc.now();
-
-        // Creamos el string con el formato deseado
-        char buffer[20];
-        sprintf(buffer, "%04d-%02d-%02d %02d:%02d:%02d", 
-                now.year(), now.month(), now.day(), 
-                now.hour(), now.minute(), now.second());
-
-        // LLAMADA CORREGIDA: Pasamos el buffer de texto y los floats
-        if(!datalogger.writeRow(buffer, res.buffer, res.size)){
-            Serial.println("Error escribiendo un nuevo dato en el data_logger");
-        } 
-
-        datalogger.printLogToSerial();
-    }else{
-
-      Serial.println("creo que salta el error aqui");
-    }
-}
-
-unsigned long prevTime = 0;
-void printErrorNoRTC(){
-  if(millis()-prevTime>3000){
-    Serial.println("No RTC Module");
-    prevTime = millis();
-  }    
 }
 

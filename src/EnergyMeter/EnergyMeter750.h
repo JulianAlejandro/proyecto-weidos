@@ -10,7 +10,7 @@
 #define MAX_MODBUS_REGS_REQUEST 125
 #define MAX_EM_ADDR 22000
 
-struct RegDataBuffer {
+struct rawDataBuffer {
     uint16_t* buffer;  // Puntero a los datos
     uint16_t size;    // Cantidad de registros leídos
 };
@@ -35,7 +35,7 @@ class EnergyMeter750 {
 
     uint16_t readData(uint16_t addr); 
 
-    RegDataBuffer readDataBuffer(){ return { _internalBuffer, _lastReadSize };}
+    rawDataBuffer readDataBuffer(){ return { _internalBuffer, _lastReadSize };}
 
     bool executeRequest(EM_request req);
 

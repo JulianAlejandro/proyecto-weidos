@@ -11,7 +11,6 @@ typedef void (*LineCallback)(const char* line, void* context);
 class SDManager {
 private:
     //uint8_t _csPin;
-    //bool _initialized;
     File _currentFile; 
     bool _initialized = false;
 

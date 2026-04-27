@@ -34,7 +34,7 @@ public:
     void selectLogByIndex(uint16_t index);
 
     bool writeHeader(const char** titulos, uint16_t numTitulos); 
-    bool writeRow(const char* timestamp, const float* values, uint16_t numValues);
+    bool writeRow(const char* timestamp, const char** values, uint16_t numValues);
 
     void clearLogFile();
     void printLogToSerial();

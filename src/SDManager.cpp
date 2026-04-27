@@ -8,6 +8,7 @@ SDManager::SDManager() {
     // Cuerpo vacío
 }
 
+
 //SDManager::SDManager(uint8_t csPin) : _csPin(csPin), _initialized(false) {}
 
 // TODO: pensar que mas cosas tiene que hacer el administrador de SD
@@ -39,8 +40,6 @@ bool SDManager::createFile(const char* path) {
 
     return false; // Error al crear (ej: tarjeta llena o nombre inválido)
 }
-
-
 
 bool SDManager::isReady() {
     return _initialized;
@@ -128,3 +127,5 @@ bool SDManager::getAllLines(const char* path, LineCallback callback, void* conte
     file.close();
     return true;
 }
+
+

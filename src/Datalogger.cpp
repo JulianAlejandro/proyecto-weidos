@@ -146,6 +146,34 @@ bool Datalogger::writeHeader(const char** titulos, uint16_t numTitulos) {
     return _sd->appendLine(_currentLogFile, buffer);
 }
 
+
+bool Datalogger::writeRow(const char* timestamp, const char** values, uint16_t numValues) {
+    // 1. Verificaciones de seguridad
+    if (numValues == 0 || _currentLogFile[0] == '\0') return false;
+
+    // 2. Buffer para la línea completa
+    // ¡OJO! Si MAX_MODBUS_REGS es 125, 256 bytes es MUY poco. 
+    // Recomendado aumentar a 512 o 1024 según tus necesidades.
+    char buffer[512]; 
+    
+    // Iniciamos el buffer con el timestamp
+    snprintf(buffer, sizeof(buffer), "%s", timestamp);
+
+    // 3. Concatenamos cada valor de texto
+    for (uint16_t i = 0; i < numValues; i++) {
+        // Añadimos el separador
+        strncat(buffer, ";", sizeof(buffer) - strlen(buffer) - 1);
+        
+        // Añadimos el valor (que ya es una cadena de texto)
+        if (values[i] != nullptr) {
+            strncat(buffer, values[i], sizeof(buffer) - strlen(buffer) - 1);
+        }
+    }
+
+    // 4. Escribimos la línea completa en la SD
+    return _sd->appendLine(_currentLogFile, buffer);
+}
+/*
 bool Datalogger::writeRow(const char* timestamp, const float* values, uint16_t numValues) {
     if (numValues == 0 || strlen(_currentLogFile) == 0) return false;
 
@@ -164,6 +192,7 @@ bool Datalogger::writeRow(const char* timestamp, const float* values, uint16_t n
 
     return _sd->appendLine(_currentLogFile, buffer);
 }
+*/
 
 void Datalogger::clearLogFile() {
     if (strlen(_currentLogFile) > 0) {
