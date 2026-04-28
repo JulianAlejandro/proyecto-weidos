@@ -128,4 +128,22 @@ bool SDManager::getAllLines(const char* path, LineCallback callback, void* conte
     return true;
 }
 
+/*
+File SDManager::getFileStream(const char* path) {
+    if (!_initialized) return File(); // Devuelve un objeto File vacío (evalúa como false)
+    
+    return SD.open(path, FILE_READ);
+}
+*/
 
+bool SDManager::withFile(const char* path, StreamCallback callback, void* context) {
+    if (!_initialized) return false;
+
+    File file = SD.open(path, FILE_READ);
+    if (!file) return false;
+
+    callback(file, context);
+    
+    file.close();
+    return true;
+}

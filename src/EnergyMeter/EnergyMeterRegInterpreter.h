@@ -3,7 +3,7 @@
 #define ENERGY_METER_INTERPRETER_H
 
 #include "../SDManager.h"
-#include <vector>
+//#include <vector>
 
 #define NUM_COL_REG_EM750 5
 #define MAX_MODBUS_REGS 125 // TODO DE MOMENTO ESTE INTERPRETADOR DE REGISTROS FUNCIONA SOLO PARA MODBUS 
@@ -68,6 +68,7 @@ struct stringDataEM{
 
 typedef void (*TitleHandler)(const char* title, void* arg);
 
+//TODO String _setup cambiar
 class EnergyMeterRegInterpreter {
 
 private:

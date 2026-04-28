@@ -1,5 +1,5 @@
-#include <ArduinoJson.h>
-#include <SD.h>
+#include "src/SDManager.h"
+//#include <SD.h>
 
 // Estructura para agrupar los datos de forma limpia
 struct DeviceConfig {
@@ -12,12 +12,18 @@ struct DeviceConfig {
 class ConfigManager {
 private:
     DeviceConfig _config;
-    const char* _filename;
+    const char* _filename;// fichero donde buscar la informacion
+    SDManager* _sd = nullptr; 
+
+    static void staticCallback(Stream& data, void* context);
 
 public:
-    ConfigManager(const char* filename) : _filename(filename) {}
+    ConfigManager(SDManager* sdManager);
+
+    //DeviceConfig getDeviceConfig();
 
     // Lee la SD y carga los datos en la estructura privada
+    /*
     bool begin() {
         File file = SD.open(_filename);
         if (!file) return false;
@@ -35,10 +41,9 @@ public:
         _config.meas_interval = doc["intervals"]["meas_interval_ms"] | 1000;
 
         return true;
-    }
+    }*/
 
     // Método para entregar la configuración a otros objetos
-    DeviceConfig getConfig() {
-        return _config;
-    }
+    DeviceConfig getDeviceConfig();
 };
+

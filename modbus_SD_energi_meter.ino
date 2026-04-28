@@ -1,143 +1,12 @@
-/*
-#include "src/Datalogger.h"
-#include "src/SDManager.h"
-#include <RTClib.h> // Asegúrate de incluir la librería del RTC
-
-// Instancias globales
-SDManager sdManager;
-Datalogger logger(&sdManager);
-RTC_DS3231 rtc;
-
-// Configuración de los datos a loguear
-const char* cabeceras[] = {"Voltaje", "Corriente", "Potencia"};
-const uint16_t numCampos = 3;
-
-void setup() {
-    Serial.begin(115200);
-    while (!Serial) delay(10); 
-
-    Serial.println(F("\n--- TEST DATALOGGER CON FECHA ---"));
-
-    // 1. Inicializar SD
-    if (!sdManager.begin()) {
-        Serial.println(F("Error: No se pudo inicializar la SD."));
-        while (1); 
-    }
-
-    // 2. Inicializar Datalogger
-    if (!logger.begin()) {
-        Serial.println(F("Error: No se pudo inicializar el Datalogger."));
-        while (1);
-    }
-
-    // 3. Inicializar RTC
-    if (!rtc.begin()) {
-        Serial.println(F("Error: No se detectó el RTC."));
-        // Aquí podrías decidir si continuar con un nombre genérico o bloquear
-    }
-
-    // 4. Generar el nombre del archivo basado en la fecha
-    DateTime now = rtc.now();
-    char nombre[32]; // Buffer para la ruta completa
-    
-
-    // Formato: /LOGS/260424.txt (6 caracteres, dentro del límite)
-    snprintf(nombre, sizeof(nombre), "%02d%02d%02d.txt", 
-      now.year() % 100, now.month(), now.day());
-
-    Serial.print(F("Intentando crear archivo: "));
-    Serial.println(nombre);
-
-    // 5. Usar addAndSetLogFile con el nuevo nombre
-    // Gracias a tu lógica interna, si el archivo de hoy ya existe, creará L20260424_1.txt
-    if (logger.newLog(nombre)) {
-        Serial.println(F("Archivo configurado correctamente."));
-    } else {
-        Serial.println(F("Error al crear el archivo de log."));
-    }
-
-    // 6. Escribir la cabecera
-    if (logger.writeHeader(cabeceras, numCampos)) {
-        Serial.println(F("Cabecera escrita."));
-    }
-
-    // 7. Simular datos
-    Serial.println(F("--- Escribiendo datos de prueba ---"));
-    for (int i = 0; i < 5; i++) {
-        char timeStr[10];
-        DateTime tempTime = rtc.now();
-        snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", tempTime.hour(), tempTime.minute(), tempTime.second());
-
-        float datosSimulados[numCampos] = { 220.5, 5.2, 1146.6 };
-
-        logger.writeRow(timeStr, datosSimulados, numCampos);
-        delay(500);
-    }
-
-    // 8. Ver resultado
-    logger.printLogToSerial();
-    Serial.println(F("\n--- PROCESO COMPLETADO ---"));
-}
-
-void loop() {
-
-}
-*/
-
-//#include <ArduinoJson.h>
-#include <Ethernet.h>
-#include <ArduinoModbus.h>
-#include <RTClib.h>
-
-//Librerias mias 
-#include "src/Datalogger.h"
-//#include "src/EnergyMeter/EnergyMeter750.h"
+#include "ConfigManager.h"
 #include "src/SDManager.h"
 
-#include "src/EnergyMeter/EnergyMeterRegInterpreter.h"
-// --- Configuración de Red ---
-/*
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
-IPAddress ip(192, 168, 0, 10);
-IPAddress server(192, 168, 0, 100); // update with the IP Address of your Modbus server
+#include <ArduinoJson.h>
 
-EthernetClient ethClient;
-ModbusTCPClient modbusTCPClient(ethClient);
-*/
-RTC_DS3231 rtc;
-
-//---Objetos de Gestion 
 SDManager sd;
-Datalogger datalogger(&sd);
-EnergyMeterRegInterpreter regInterpreter(&sd);
-//EnergyMeter750 energy_meter(1); // TODO ID ES DE MODBUS MAL 
-
-//----codigo a revisar 
-//#define SLAVE_ADDRESS 1 // A eliminar posiblemente 
-
-unsigned long anteriorMillisModbus = 0; // Almacena la última vez que leíste
-const long intervaloModbus = 1000;      // Intervalo de 5 segundos
-long contadorPrueba = 0; 
-
-unsigned long anteriorMillisArchivo = 0;
-const unsigned long intervaloArchivo = 10000; // 10 segundos
-int contador_ficheros = 0;
-
-//EM_request req;              // El contador que quieres incrementar
-
-//uint16_t totalTitulos;
-//const char* cabeceraCompleta[totalTitulos];
-
-void lectura_modbus();
-void crear_nueva_sesion_log();
-
-titlesBuffer misTitulos;
-
-//String nombre = "nombre";
-
+ConfigManager cfgManager(&sd);
 
 void setup() {
-  
   Serial.begin(115200);
 
   if (!sd.begin()) {
@@ -145,78 +14,134 @@ void setup() {
     while(1); //bloqueamos el sistema ya que si no hay SD no se puede hacer nada. 
   }
 
-  if(! datalogger.begin()){ // mira si esta creada el directorio de log si no esta creado , lo crea
-    Serial.println("Error en encendido de datalogger");
-  }
- 
-  if(! regInterpreter.begin()){
-    Serial.println("Fallo reg interpretert");
-  }
-  
-  if (! rtc.begin()) { // todo while(1) bloquea al micro, cambiar
-     Serial.print("Fallo RTC");
-  }
+  DeviceConfig devcfg = cfgManager.getDeviceConfig(); 
 
-  //req = regInterpreter.startNewRequest(19000, 10);
-  regInterpreter.startNewRequest(19000, 10);
-  misTitulos = regInterpreter.getTitles();
-  
-  if(!datalogger.newSesion(String("inicial").c_str(), misTitulos.buffer, misTitulos.size)){
-    Serial.println("algo salio regular");
-  }
-  Serial.print("Empieza el loop");
+  //DeserializationError error = deserializeJson(doc, configFile);
+
+    Serial.println("--- Configuración Cargada ---");
+  Serial.print("Dirección inicio: "); Serial.println(devcfg.start_addr);
+  Serial.print("Longitud: ");         Serial.println(devcfg.length);
+  Serial.print("Intervalo Log: ");    Serial.println(devcfg.log_interval);
+  Serial.print("Intervalo Medida: "); Serial.println(devcfg.meas_interval);
+
+
 }
 
 void loop() {
-  unsigned long actualMillis = millis();
-
-    if (actualMillis - anteriorMillisModbus >= intervaloModbus) { // loop cada 5 m
-        anteriorMillisModbus = actualMillis;
-           lectura_modbus();       
-    }
-
-      if (actualMillis - anteriorMillisArchivo >= intervaloArchivo) {
-        anteriorMillisArchivo = actualMillis;
-        crear_nueva_sesion_log();
-    }
+  // Tu lógica de Modbus y Logs usaría las variables aquí
 }
 
+/*
+#include "ConfigManager.h"
+#include "src/SDManager.h"
 
-void lectura_modbus() {
-    // SIMULACIÓN DE DATOS
-    const char* datosPrueba[] = {"230.5", "1.25", "285.0", "50.01", "0.98"};
+#include <ArduinoJson.h>
 
-    DateTime now = rtc.now();
-    char bufferTime[20];
-    sprintf(bufferTime, "%04d-%02d-%02d %02d:%02d:%02d", 
-            now.year(), now.month(), now.day(), 
-            now.hour(), now.minute(), now.second());
+SDManager sd;
 
-    if(!datalogger.writeRow(bufferTime, datosPrueba, 5)){
-        Serial.println("Error escribiendo en SD"); 
-    } 
+
+int start_addr;
+int length;
+long log_interval;
+long measure_interval;
+
+void miLogicaJson(Stream& data, void* context) {
+    JsonDocument* doc = (JsonDocument*)context;
+    deserializeJson(*doc, data);
 }
 
-void crear_nueva_sesion_log() {
-    
-    DateTime ahora = rtc.now();
-    char nombreFichero[25]; 
+void setup() {
+  Serial.begin(115200);
 
-   // sprintf(nombreFichero, "%02d%02d%02d%02d%02d%02d.txt", 
-    
-    sprintf(nombreFichero, "%02d%02d%02d.txt", 
-            //ahora.year() % 100, // Usamos % 100 para obtener solo "26" de "2026"
-            //ahora.month(), 
-            //ahora.day(), 
-            ahora.hour(), 
-            ahora.minute(), 
-            ahora.second());
-    
-    Serial.print("Cambiando a nueva sesion: ");
-    Serial.println(nombreFichero);
-       
-    if(!datalogger.newSesion(nombreFichero, misTitulos.buffer, misTitulos.size)){
-        Serial.println("Error al crear el archivo por timestamp");
-    }
+  if (!sd.begin()) {
+    Serial.println(F("Error: No se pudo iniciar la SD"));
+    while(1); //bloqueamos el sistema ya que si no hay SD no se puede hacer nada. 
+  }
+  //File configFile = SD.open("/config.jsn");
+
+  JsonDocument doc;
+  sd.withFile(String("/config.jsn").c_str(), miLogicaJson, &doc);
+
+  start_addr       = doc["start_addr"] | 0;
+  length           = doc["length"]     | 1;
+  log_interval     = doc["log_interval"] | 300;
+  measure_interval = doc["measure_interval"] | 1000;
+
+  //DeserializationError error = deserializeJson(doc, configFile);
+
+    Serial.println("--- Configuración Cargada ---");
+  Serial.print("Dirección inicio: "); Serial.println(start_addr);
+  Serial.print("Longitud: ");         Serial.println(length);
+  Serial.print("Intervalo Log: ");    Serial.println(log_interval);
+  Serial.print("Intervalo Medida: "); Serial.println(measure_interval);
+
+
 }
 
+void loop() {
+  // Tu lógica de Modbus y Logs usaría las variables aquí
+}
+*/
+
+/*
+#include <SPI.h>
+#include <SD.h>
+#include <ArduinoJson.h>
+
+// Variables donde guardaremos los datos leídos
+int start_addr;
+int length;
+long log_interval;
+long measure_interval;
+
+void setup() {
+  Serial.begin(115200);
+
+  // 1. Inicializar SD
+  if (!SD.begin()) {
+    Serial.println("Error: No se pudo montar la tarjeta SD");
+    return;
+  }
+
+  // 2. Abrir el archivo
+  File configFile = SD.open("/config.jsn");
+  if (!configFile) {
+    Serial.println("Error: No se encontró config.json");
+    return;
+  }
+
+  // 3. Crear el documento JSON (v7)
+  JsonDocument doc;
+
+  // 4. Deserializar (leer y parsear)
+  DeserializationError error = deserializeJson(doc, configFile);
+
+  // 5. Cerrar el archivo (ya no lo necesitamos, los datos están en 'doc')
+  configFile.close();
+
+  if (error) {
+    Serial.print("Error en JSON: ");
+    Serial.println(error.c_str());
+    return;
+  }
+
+  // 6. Asignar valores a nuestras variables
+  // El operador "|" define un valor por defecto si el JSON está mal
+  start_addr       = doc["start_addr"] | 0;
+  length           = doc["length"]     | 1;
+  log_interval     = doc["log_interval"] | 300;
+  measure_interval = doc["measure_interval"] | 1000;
+
+  // 7. Mostrar resultados
+  Serial.println("--- Configuración Cargada ---");
+  Serial.print("Dirección inicio: "); Serial.println(start_addr);
+  Serial.print("Longitud: ");         Serial.println(length);
+  Serial.print("Intervalo Log: ");    Serial.println(log_interval);
+  Serial.print("Intervalo Medida: "); Serial.println(measure_interval);
+}
+
+void loop() {
+  // Tu lógica de Modbus y Logs usaría las variables aquí
+}
+
+*/

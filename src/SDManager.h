@@ -7,6 +7,7 @@
 
 // Definimos el tipo de callback: una función que recibe un puntero a char (la línea)
 typedef void (*LineCallback)(const char* line, void* context);
+typedef void (*StreamCallback)(Stream& stream, void* context);
 
 class SDManager {
 private:
@@ -40,6 +41,10 @@ public:
     void printFileToSerial(const char* path);
 
     bool getAllLines(const char* path, LineCallback callback, void* context);
+
+    //File getFileStream(const char* path);
+    // do something with this File
+    bool withFile(const char* path, StreamCallback callback, void* context);
 };
 
 #endif
