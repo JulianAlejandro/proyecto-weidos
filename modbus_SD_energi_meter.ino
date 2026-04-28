@@ -84,49 +84,56 @@ void loop() {
 }
 */
 
+//#include <ArduinoJson.h>
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
 #include <RTClib.h>
 
 //Librerias mias 
 #include "src/Datalogger.h"
-#include "src/EnergyMeter/EnergyMeter750.h"
+//#include "src/EnergyMeter/EnergyMeter750.h"
 #include "src/SDManager.h"
 
 #include "src/EnergyMeter/EnergyMeterRegInterpreter.h"
 // --- Configuración de Red ---
+/*
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
 IPAddress ip(192, 168, 0, 10);
 IPAddress server(192, 168, 0, 100); // update with the IP Address of your Modbus server
 
 EthernetClient ethClient;
 ModbusTCPClient modbusTCPClient(ethClient);
+*/
 RTC_DS3231 rtc;
 
 //---Objetos de Gestion 
 SDManager sd;
 Datalogger datalogger(&sd);
 EnergyMeterRegInterpreter regInterpreter(&sd);
-EnergyMeter750 energy_meter(1); // TODO ID ES DE MODBUS MAL 
+//EnergyMeter750 energy_meter(1); // TODO ID ES DE MODBUS MAL 
 
 //----codigo a revisar 
-#define SLAVE_ADDRESS 1 // A eliminar posiblemente 
+//#define SLAVE_ADDRESS 1 // A eliminar posiblemente 
 
 unsigned long anteriorMillisModbus = 0; // Almacena la última vez que leíste
-const long intervaloModbus = 5000;      // Intervalo de 5 segundos
-long contadorPrueba = 0;   
+const long intervaloModbus = 1000;      // Intervalo de 5 segundos
+long contadorPrueba = 0; 
 
-EM_request req;              // El contador que quieres incrementar
+unsigned long anteriorMillisArchivo = 0;
+const unsigned long intervaloArchivo = 10000; // 10 segundos
+int contador_ficheros = 0;
+
+//EM_request req;              // El contador que quieres incrementar
 
 //uint16_t totalTitulos;
 //const char* cabeceraCompleta[totalTitulos];
 
-bool loop_cada_x_tiempo();
+void lectura_modbus();
+void crear_nueva_sesion_log();
 
-int contador = 0; 
-int contador_nombre = 1; 
+titlesBuffer misTitulos;
 
-String nombre = "nombre";
+//String nombre = "nombre";
 
 
 void setup() {
@@ -150,101 +157,66 @@ void setup() {
      Serial.print("Fallo RTC");
   }
 
-  if(!energy_meter.begin(&modbusTCPClient)){ // se le pasa el tipo de conexion y acceso a funciones de la SD 
-    Serial.println("error al iniciar el energy meter");
+  //req = regInterpreter.startNewRequest(19000, 10);
+  regInterpreter.startNewRequest(19000, 10);
+  misTitulos = regInterpreter.getTitles();
+  
+  if(!datalogger.newSesion(String("inicial").c_str(), misTitulos.buffer, misTitulos.size)){
+    Serial.println("algo salio regular");
   }
-
-  Ethernet.init(ETHERNET_CS);
-  if (Ethernet.linkStatus() == LinkOFF) Serial.println("Ethernet Cable is not connected");
-  
-  Ethernet.begin(mac, ip); 
-
-  delay(5000);
-
-  req = regInterpreter.startNewRequest(19000, 10);
-  titlesBuffer misTitulos = regInterpreter.getTitles();
-  
-  // creamos la cabecera con titulos y timestamp
-
-      // 2. Creamos un nuevo buffer temporal con espacio para el Timestamp (+1)
-      uint16_t totalTitulos = misTitulos.size + 1;
-      const char* cabeceraCompleta[totalTitulos];
-
-      cabeceraCompleta[0] = "Timestamp";
-
-      for (uint16_t i = 0; i < misTitulos.size; i++) {
-        cabeceraCompleta[i + 1] = misTitulos.buffer[i];
-      }
-  
-  datalogger.clearLogFile(); // limpia el directorio activo actualmente
-  if(!datalogger.writeHeader(cabeceraCompleta, totalTitulos)){
-    Serial.println("error al poner los titulos");
-  }
-
-Serial.print("Empieza el loop");
-}
-
-bool loop_cada_x_tiempo() {
-    if (contador == 5){
-      contador_nombre = contador_nombre + 1;
-      nombre = nombre + String(contador_nombre) + String(".txt");    
-      datalogger.newLog(nombre.c_str()); // Añadir esta líne
-      nombre = "nombre"; 
-      contador = 0; 
-    }
-
-
-    //contador_nombre = contador_nombre + 1; 
-    
-    contador++; 
-   // if (!energy_meter.executeRequest(req)) {return 0;}
-
-    //  rawDataBuffer raw = energy_meter.readDataBuffer();
-    //  regInterpreter.getDataProcess(raw.buffer, raw.size); 
-    //  stringDataEM res = regInterpreter.getData();
-
-    const char* datosPrueba[] = {
-        "230.5",  // Voltaje
-        "1.25",   // Corriente
-        "285.0",  // Potencia
-        "50.01",  // Frecuencia
-        "0.98"    // Factor de potencia
-    };
-
-      DateTime now = rtc.now();
-
-          // Creamos el string con el formato deseado
-           char buffer[20];
-           sprintf(buffer, "%04d-%02d-%02d %02d:%02d:%02d", 
-            now.year(), now.month(), now.day(), 
-            now.hour(), now.minute(), now.second());
-
-      // LLAMADA CORREGIDA: Pasamos el buffer de texto y los floats
-      if(!datalogger.writeRow(buffer, datosPrueba, 5)){
-        Serial.println("Error escribiendo un nuevo dato en el data_logger");
-      } 
-
-      datalogger.printLogToSerial();
-      
-    return 0; 
+  Serial.print("Empieza el loop");
 }
 
 void loop() {
-
   unsigned long actualMillis = millis();
 
-    if (actualMillis - anteriorMillisModbus >= intervaloModbus) {
+    if (actualMillis - anteriorMillisModbus >= intervaloModbus) { // loop cada 5 m
         anteriorMillisModbus = actualMillis;
+           lectura_modbus();       
+    }
 
-       // if (!modbusTCPClient.connected()) {
-        if(false){
-            Serial.println("Reconectando Modbus...");
-            modbusTCPClient.begin(server, 502);
-        } else {
-           if(!loop_cada_x_tiempo()){
-            //Serial.println("Error loop");
-           }
-        }
+      if (actualMillis - anteriorMillisArchivo >= intervaloArchivo) {
+        anteriorMillisArchivo = actualMillis;
+        crear_nueva_sesion_log();
+    }
+}
+
+
+void lectura_modbus() {
+    // SIMULACIÓN DE DATOS
+    const char* datosPrueba[] = {"230.5", "1.25", "285.0", "50.01", "0.98"};
+
+    DateTime now = rtc.now();
+    char bufferTime[20];
+    sprintf(bufferTime, "%04d-%02d-%02d %02d:%02d:%02d", 
+            now.year(), now.month(), now.day(), 
+            now.hour(), now.minute(), now.second());
+
+    if(!datalogger.writeRow(bufferTime, datosPrueba, 5)){
+        Serial.println("Error escribiendo en SD"); 
+    } 
+}
+
+void crear_nueva_sesion_log() {
+    
+    DateTime ahora = rtc.now();
+    char nombreFichero[25]; 
+
+   // sprintf(nombreFichero, "%02d%02d%02d%02d%02d%02d.txt", 
+    
+    sprintf(nombreFichero, "%02d%02d%02d.txt", 
+            //ahora.year() % 100, // Usamos % 100 para obtener solo "26" de "2026"
+            //ahora.month(), 
+            //ahora.day(), 
+            ahora.hour(), 
+            ahora.minute(), 
+            ahora.second());
+    
+    Serial.print("Cambiando a nueva sesion: ");
+    Serial.println(nombreFichero);
+       
+    if(!datalogger.newSesion(nombreFichero, misTitulos.buffer, misTitulos.size)){
+        Serial.println("Error al crear el archivo por timestamp");
     }
 }
 

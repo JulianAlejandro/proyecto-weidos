@@ -26,6 +26,8 @@ public:
 
     bool begin();
 
+    bool newSesion(const char * name, const char** titles, uint16_t numTitles);
+
     bool newLog(const char* name); // Añadir esta línea
 
     void scanExistingLogs();

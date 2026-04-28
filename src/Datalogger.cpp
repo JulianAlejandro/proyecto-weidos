@@ -209,3 +209,27 @@ void Datalogger::printLogToSerial() {
 
     _sd->printFileToSerial(_currentLogFile);
 }
+
+// todo poner en privado las funciones de apoyo
+bool Datalogger::newSesion(const char * name, const char** titles, uint16_t numTitles){
+
+    if(!newLog(name)){
+        return false; 
+    }
+    clearLogFile();
+
+          // 2. Creamos un nuevo buffer temporal con espacio para el Timestamp (+1)
+    uint16_t totalTitulos = numTitles + 1;
+    const char* cabeceraCompleta[totalTitulos];
+
+    cabeceraCompleta[0] = "Timestamp";
+
+    for (uint16_t i = 0; i < numTitles; i++) {
+        cabeceraCompleta[i + 1] = titles[i];
+    }
+
+    if(! writeHeader(cabeceraCompleta, totalTitulos)){
+        return false; 
+    }
+    return true; 
+}
