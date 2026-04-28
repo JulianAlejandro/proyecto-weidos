@@ -1,4 +1,3 @@
-
 #include "EnergyMeter750.h"
 #include "EnergyMeterRegInterpreter.h"
 
@@ -45,5 +44,5 @@ bool EnergyMeter750::executeRequest(EM_request req) {
 }
 
  uint16_t EnergyMeter750::readData(uint16_t addr){
-
+  // todo 
  }

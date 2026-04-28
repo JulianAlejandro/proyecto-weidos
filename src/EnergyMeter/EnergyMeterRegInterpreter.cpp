@@ -186,7 +186,9 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
     
     // 3. Leer el archivo. El SDManager llamará a staticCallback -> handleLine por cada línea
     if (_sd->isReady()) {
-        _sd->getAllLines(_setupFile.c_str(), staticCallback, &ctx);
+        if(!_sd->getAllLines(_setupFile.c_str(), staticCallback, &ctx)){
+                Serial.print("Error puede estar aqui"); 
+        }
     }
 
     // 4. Una vez finalizada la lectura, actualizamos el registro de control
