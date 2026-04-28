@@ -139,7 +139,7 @@ File SDManager::getFileStream(const char* path) {
 bool SDManager::withFile(const char* path, StreamCallback callback, void* context) {
     if (!_initialized) return false;
 
-    File file = SD.open(path, FILE_READ);
+    File file = SD.open(path);
     if (!file) return false;
 
     callback(file, context);

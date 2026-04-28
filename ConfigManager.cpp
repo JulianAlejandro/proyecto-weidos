@@ -48,9 +48,15 @@ DeviceConfig ConfigManager::getDeviceConfig() {
     // Nota: Si doc["campo"] no existe, se usará el valor tras el pipe '|'
     _config.start_addr = doc["start_addr"] | 1;
     _config.length = doc["length"] | 1;
-    _config.log_interval_s = (doc["log_interval_sec"] | 60); // Guardamos en segundos
-    _config.meas_interval_ms = doc["measure_interval_ms"] | 1000;
+    _config.log_interval_s = (doc["log_interval"] | 60); // Guardamos en segundos
+    _config.meas_interval_ms = doc["measure_interval"] | 1000;
 
+/*
+      start_addr       = doc["start_addr"]       | 0;
+  length           = doc["length"]           | 1;
+  log_interval     = doc["log_interval"]     | 300;
+  measure_interval = doc["measure_interval"] | 1000;
+*/
     return _config;
 }
 /*
