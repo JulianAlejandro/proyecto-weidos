@@ -211,6 +211,7 @@ void Datalogger::printLogToSerial() {
 }
 
 // todo poner en privado las funciones de apoyo
+// todo analizar que los titulos concuerdan con el dato.....esto en un futuro
 bool Datalogger::newSesion(const char * name, const char** titles, uint16_t numTitles){
 
     if(!newLog(name)){

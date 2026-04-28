@@ -11,7 +11,7 @@
 
 #define MAX_DATA_SIZE 4 // numero maximo de tamaño que puede tener un dato en el mapa de registros 
 
-#define SETUP_FILE "/example2.txt"
+#define SETUP_FILE "/EM_map.txt"
 
 // size number reg 16 bits
 #define SIZE_FLOAT   2 // 2 reg 16 bits
