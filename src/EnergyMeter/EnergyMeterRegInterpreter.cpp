@@ -7,17 +7,6 @@ struct InterpreterContext {
     uint16_t size;
 };
 
-/*
-// Estructura interna para no mezclar con el flujo normal de datos
-struct TitleContext {
-    EnergyMeterRegInterpreter* instance;
-    uint16_t start;
-    uint16_t size;
-    TitleHandler externalHandler;
-    void* externalArg;
-};
-*/
-
 // Constructor: Inicializamos el puntero al manager de la SD
 EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager) {
     _sd = sdManager;
@@ -56,15 +45,8 @@ void EnergyMeterRegInterpreter::staticCallback(const char* line, void* context) 
     // Ahora pasamos el buffer (que es char*) a handleLine
     ctx->instance->handleLine(buffer, ctx->start_addr, ctx->size);
 }
-/*
-void EnergyMeterRegInterpreter::staticCallback(const char* line, void* context) {
-    // Convertimos el puntero genérico de nuevo a nuestro objeto
-    InterpreterContext* ctx = (InterpreterContext*)context;
 
-    // 2. Usamos la instancia para llamar al manejador, pasando los datos extra
-    ctx->instance->handleLine(line, ctx->start_addr, ctx->size);
-}
-*/
+
 
 void EnergyMeterRegInterpreter::handleLine(char* line, uint16_t start, uint16_t size) {
     // 1. Verificación básica (ya no usamos isdigit aquí porque splitString lo hará)
@@ -97,77 +79,10 @@ void EnergyMeterRegInterpreter::handleLine(char* line, uint16_t start, uint16_t 
     }
 }
 
-/*
-// Cambiamos a char* line para permitir la tokenización in-situ
-void EnergyMeterRegInterpreter::handleLine(char* line, uint16_t start, uint16_t size) {
-    if (line == nullptr || line[0] == '\0' || !isdigit(line[0])) return;
 
-    reg_EM_750 aux;
-    if (splitString(line, ';', aux)) {
-        // Convertimos el puntero de la columna ADDR a entero
-        uint16_t addr = (uint16_t)atoi(aux.data[ADDR]);
-
-        if (addr >= start && addr < (start + size)) {
-            // Convertimos el puntero de FORMAT a nuestro Enum
-            // (Tendrás que ajustar stringToFormat para que acepte const char*)
-            coded_format formatEnum = stringToFormat(aux.data[FORMAT]);
-
-            if (formatEnum != FORMAT_UNKNOWN && _SDlastRowReadSize < MAX_MODBUS_REGS) {
-                int i = _SDlastRowReadSize;
-
-                _SDformatBuffer[i] = formatEnum;
-                _SDaddrsBuffer[i] = addr;
-                
-                // Copiamos el texto de la columna NOTE a nuestra matriz fija
-                // aux.data[NOTE] es ahora un puntero a una parte de 'line'
-                strncpy(_titulos[i], aux.data[NOTE], MAX_TITLES_SIZE - 1);
-                _titulos[i][MAX_TITLES_SIZE - 1] = '\0'; 
-
-                _current_request.size += getFormatSize(formatEnum);
-                _SDlastRowReadSize++;
-            }
-        }
-    }
-}
-*/
-/*
-// función que recibe lineas del mapa de registro y obtiene informacion
-void EnergyMeterRegInterpreter::handleLine(const char* line, uint16_t start, uint16_t size) {
-    // 1. Verificación básica: Si la línea está vacía o es un comentario (opcional)
-    if (line == nullptr || line[0] == '\0' || !isdigit(line[0])) return;
-
-    reg_EM_750 aux;
-    // 2. Intentar dividir la cadena
-    if (splitString(line, ';', aux)) {
-        uint16_t addr = (uint16_t)aux.data[ADDR].toInt();
-
-        // 3. Filtrar: ¿Está la dirección dentro del rango solicitado?
-        if (addr >= start && addr < (start + size)) {
-            coded_format formatEnum = stringToFormat(aux.data[FORMAT]);
-
-            // 4. Validar formato y espacio en el buffer
-            if (formatEnum != FORMAT_UNKNOWN && _SDlastRowReadSize < MAX_MODBUS_REGS) {
-                int i = _SDlastRowReadSize; // Índice actual
-
-                // Guardamos los metadatos del registro
-                _SDformatBuffer[i] = formatEnum;
-                _SDaddrsBuffer[i] = addr;
-                
-                // Manejo de títulos (String persistente para que el const char* no apunte a basura)
-                //_titulosPersistentes[i] = aux.data[NOTE];
-                //_titulosBuffer[i] = _titulosPersistentes[i].c_str();
-
-                // Actualizamos el tamaño total de registros Modbus que se pedirán
-                _current_request.size += getFormatSize(formatEnum);
-                
-                // Incrementamos el contador de filas válidas encontradas
-                _SDlastRowReadSize++;
-            }
-        }
-    }
-}
-*/
 // TODO Modificar en donde esta el setup 
+// TODO es importante mejorar esto teniendo en cuenta TODO el mapa de registros
+// Esta funcion inicia una solicitud de interpretacion de un rango de direcciones. 
 EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
     // 1. Reiniciar estado para la nueva petición
     _current_request.start_addr = start_addr; 
@@ -233,7 +148,6 @@ CompleteDataRegBuffer EnergyMeterRegInterpreter::getDataProcess(const uint16_t* 
     return res; 
 }
 
-
 //TODO: para poder hacer este splitString se tiene que cumplir con el formato de registro ADDR;FORMAT;RD_WR;UNIT;NOTE; 
 // como minimo NUM_COL_REG_EM750 valores , sino error
 bool EnergyMeterRegInterpreter::splitString(char* linea, char div_char, reg_EM_750 &resultado) {
@@ -295,50 +209,6 @@ titlesBuffer EnergyMeterRegInterpreter::getTitles() {
     return res;
 }
 
-/*
-bool EnergyMeterRegInterpreter::getTitles(const uint16_t start_addr, const uint16_t size, TitleHandler handler, void* arg) {
-    // 1. Verificaciones de seguridad previas
-    if (_sd == nullptr || !_sd->isReady()) {
-        Serial.println(F("Error: SDManager no inicializado o no listo."));
-        return false;
-    }
-
-    if (handler == nullptr) {
-        Serial.println(F("Error: TitleHandler (callback) es nulo."));
-        return false;
-    }
-
-    // 2. Preparar contexto
-    TitleContext ctx = {this, start_addr, size, handler, arg};
-
-    // 3. Ejecutar lectura y capturar el estado del SDManager
-    // getAllLines debería devolver true si pudo abrir el archivo satisfactoriamente
-    bool lecturaExitosa = _sd->getAllLines(_setupFile.c_str(), [](const char* line, void* context) {
-        TitleContext* tCtx = (TitleContext*)context;
-        
-        if (line == nullptr || line[0] == '\0' || !isdigit(line[0])) return;
-
-        reg_EM_750 aux;
-        if (tCtx->instance->splitString(line, ';', aux)) {
-            uint16_t addr = (uint16_t)aux.data[ADDR].toInt();
-            
-            if (addr >= tCtx->start && addr < (tCtx->start + tCtx->size)) {
-                tCtx->externalHandler(aux.data[NOTE].c_str(), tCtx->externalArg);
-            }
-        }
-    }, &ctx);
-
-    if (!lecturaExitosa) {
-        Serial.print(F("Error: No se pudo leer el archivo de configuracion: "));
-        Serial.println(_setupFile);
-        return false;
-    }
-
-    return true;
-}
-
-*/
-
 /**
  * Función auxiliar para saber cuántos registros Modbus ocupa cada formato
  */
@@ -382,8 +252,83 @@ coded_format EnergyMeterRegInterpreter::stringToFormat(const char* str) {
     return FORMAT_UNKNOWN;
 }
 
+stringDataEM EnergyMeterRegInterpreter::getStringData() {
+    stringDataEM res;
+    res.size = 0;
 
-stringDataEM EnergyMeterRegInterpreter::getData() {
+    for (int i = 0; i < _SDlastRowReadSize; i++) {
+        coded_format fmt = _completeDataR[i].format;
+        uint16_t* d = _completeDataR[i].data;
+
+        switch (fmt) {
+            case FLOAT: {
+                float f_val = getFloatConversion(d);
+                snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2f", f_val);
+                break;
+            }
+
+            case SHORT: {
+                // El cast a int16_t interpreta el bit de signo
+                int16_t s_val = (int16_t)d[0];
+                snprintf(_netaData[i], MAX_TITLES_SIZE, "%d", s_val);
+                break;
+            }
+
+            case USHORT:
+            case DFLOAT: { // DFLOAT suele ser un entero con decimales implícitos
+                snprintf(_netaData[i], MAX_TITLES_SIZE, "%u", d[0]);
+                break;
+            }
+
+            case INT: {
+                // Combinar dos registros de 16 bits en un entero de 32 con signo
+                int32_t i_val = (int32_t)(((uint32_t)d[0] << 16) | d[1]);
+                snprintf(_netaData[i], MAX_TITLES_SIZE, "%ld", i_val);
+                break;
+            }
+
+            case UINT: {
+                uint32_t ui_val = ((uint32_t)d[0] << 16) | d[1];
+                snprintf(_netaData[i], MAX_TITLES_SIZE, "%lu", ui_val);
+                break;
+            }
+
+            case BYTE: {
+                // Normalmente el byte está en la parte baja del registro
+                snprintf(_netaData[i], MAX_TITLES_SIZE, "%u", d[0] & 0xFF);
+                break;
+            }
+
+            case LONG64: {
+                // Ojo: printf con uint64_t puede requerir %llu o PRIu64
+                uint64_t l_val = ((uint64_t)d[0] << 48) | ((uint64_t)d[1] << 32) | 
+                                 ((uint64_t)d[2] << 16) | (uint64_t)d[3];
+                snprintf(_netaData[i], MAX_TITLES_SIZE, "%llu", l_val);
+                break;
+            }
+
+            case STRING: {
+                // Copia directamente los registros como caracteres (2 caracteres por registro)
+                // Asegúrate de que no desborde MAX_TITLES_SIZE
+                memcpy(_netaData[i], d, MAX_DATA_SIZE * 2);
+                _netaData[i][MAX_DATA_SIZE * 2] = '\0'; 
+                break;
+            }
+
+            default:
+                snprintf(_netaData[i], MAX_TITLES_SIZE, "n/a");
+                break;
+        }
+
+        res.buffer[i] = _netaData[i];
+        res.size++;
+    }
+
+    return res;
+}
+
+/*
+stringDataEM EnergyMeterRegInterpreter::getStringData() {
     stringDataEM res;
     res.size = 0;
 
@@ -398,8 +343,43 @@ stringDataEM EnergyMeterRegInterpreter::getData() {
             // 2. Convertimos el float a cadena de texto (char array)
             // "%.2f" limita a 2 decimales. Puedes usar "%f" para más precisión.
             snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2f", f_data);
-        } 
-        else {
+       
+        } else if(_completeDataR[i].format == SHORT) {
+            // SHORT Tamaño 1 
+            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", _completeDataR[i].data);
+            
+        } else if(_completeDataR[i].format == INT) {
+                //uint32_t combinado = ((uint32_t)data[0] << 16) | data[1]; // TODO depende de si es little endian o Big endian
+
+            uint32_t combinado = ((uint32_t)_completeDataR[i].buffer[0] << 16) | _completeDataR[i].buffer[1];
+            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", combinado);
+
+        } else if(_completeDataR[i].format == UINT) {
+
+            uint32_t combinado = ((uint32_t)_completeDataR[i].buffer[0] << 16) | _completeDataR[i].buffer[1];
+            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", combinado);
+
+        } else if(_completeDataR[i].format == USHORT){
+
+            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", _completeDataR[i].data);
+
+        } else if(_completeDataR[i].format == BYTE){
+
+            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", _completeDataR[i].data);
+
+        } else if(_completeDataR[i].format == LONG64){
+
+            uint64_t combinado = ((uint64_t)_completeDataR[i].buffer[0] << 48) | ((uint64_t)_completeDataR[i].buffer[1] << 32) | ((uint64_t)_completeDataR[i].buffer[2] << 16) | ((uint16_t)_completeDataR[i].buffer[3]);
+
+        } else if(_completeDataR[i].format == DFLOAT){
+
+            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", _completeDataR[i].data);
+
+        } else if(_completeDataR[i].format == STRING){
+
+
+
+        } else {
             // Para otros formatos (futuro), de momento ponemos un placeholder o vacío
             snprintf(_netaData[i], MAX_TITLES_SIZE, "n/a");
         }
@@ -411,3 +391,5 @@ stringDataEM EnergyMeterRegInterpreter::getData() {
 
     return res;
 }
+
+*/

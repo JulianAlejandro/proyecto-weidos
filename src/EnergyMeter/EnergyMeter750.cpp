@@ -43,6 +43,11 @@ bool EnergyMeter750::executeRequest(EM_request req) {
     return false;
 }
 
- uint16_t EnergyMeter750::readData(uint16_t addr){
-  // todo 
- }
+rawDataBuffer EnergyMeter750::readDataBuffer(){ 
+    return { _internalBuffer, _lastReadSize };
+}
+
+uint16_t EnergyMeter750::readRegByAdress(uint16_t addr){
+    _modbus->requestFrom(_slaveAddress, INPUT_REGISTERS, addr, 1);
+    return  _modbus->read();
+}

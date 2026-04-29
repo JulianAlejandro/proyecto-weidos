@@ -1,4 +1,4 @@
-#include "src/SDManager.h"
+#include "SDManager.h"
 //#include <SD.h>
 
 // Estructura para agrupar los datos de forma limpia

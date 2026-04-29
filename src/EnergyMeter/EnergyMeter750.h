@@ -34,9 +34,11 @@ class EnergyMeter750 {
 
     uint16_t readData(uint16_t addr); 
 
-    rawDataBuffer readDataBuffer(){ return { _internalBuffer, _lastReadSize };}
+    rawDataBuffer readDataBuffer();
 
     bool executeRequest(EM_request req);
+
+    uint16_t readRegByAdress(uint16_t addr);
 
 };
 

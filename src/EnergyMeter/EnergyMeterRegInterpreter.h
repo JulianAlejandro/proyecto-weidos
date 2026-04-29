@@ -109,7 +109,7 @@ public:
 
     titlesBuffer getTitles();
 
-    stringDataEM getData();
+    stringDataEM getStringData();
     //void getTitles(const uint16_t start_addr, const uint16_t size, TitleHandler handler, void* arg);
 
     // Función auxiliar para convertir String a Enum
