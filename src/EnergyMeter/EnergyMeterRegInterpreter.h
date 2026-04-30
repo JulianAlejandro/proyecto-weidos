@@ -8,9 +8,10 @@
 
 #define NUM_COL_REG_EM750 5
 #define MAX_MODBUS_REGS 125 // TODO DE MOMENTO ESTE INTERPRETADOR DE REGISTROS FUNCIONA SOLO PARA MODBUS 
-#define MAX_TITLES_SIZE 32
+#define MAX_TITLES_SIZE 32 // TODO cambiatar esto de nombre
 
 #define MAX_DATA_SIZE 4 // numero maximo de tamaño que puede tener un dato en el mapa de registros 
+#define LINE_MAP_START 4
 
 #define SETUP_FILE "/EM750map.csv"
 
@@ -53,7 +54,6 @@ struct reg_EM_750 {
     const char* data[NUM_COL_REG_EM750];
 };
 
-
 struct titlesBuffer {
     const char* buffer[MAX_MODBUS_REGS]; // Array de punteros a las cadenas
     uint16_t size;
@@ -62,6 +62,12 @@ struct titlesBuffer {
 struct stringDataEM{
     const char* buffer[MAX_MODBUS_REGS];
     uint16_t size; 
+};
+
+struct Parameters{
+    const char* log_interval;
+    const char* new_file;
+    const char* max_files; 
 };
 
 typedef void (*TitleHandler)(const char* title, void* arg);
@@ -128,6 +134,9 @@ public:
     static float getFloatConversion(const uint16_t* data);
 
     //OBTENCION DE PARAMETROS EXISTENTES DENTRO DEL FICHERO EM750map.csv
+    void loadParametersMapRegister(); 
+
+    Parameters getParameters();
     //const char* getLogInterval() { return _log_interval; }
     //const char* getNewFile() { return _new_file; }
     //const char* getMaxFiles() { return _max_files; }

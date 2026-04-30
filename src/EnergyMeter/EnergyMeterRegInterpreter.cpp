@@ -7,8 +7,6 @@ struct InterpreterContext {
     uint16_t start_addr;
     uint16_t size;
 };
-
-
 */
 
 // Estructura para pasar datos al callback de Stream
@@ -228,7 +226,8 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
             //sc->instance->handleConfigLine(line); 
         }*/
 
-        for (int i = 0; i < 4; i++) {
+        // FUNCION SIMPLE PARA SALTAR A LA UBICACION DEL MAPA DE REGISTRO
+        for (int i = 0; i < LINE_MAP_START; i++) {
             if (file.available()) {
             file.readStringUntil('\n'); 
              }
@@ -256,43 +255,7 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
     return _current_request;
 }
 
-/*
-// TODO Modificar en donde esta el setup 
-// TODO es importante mejorar esto teniendo en cuenta TODO el mapa de registros
-// Esta funcion inicia una solicitud de interpretacion de un rango de direcciones. 
-EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
 
-    
-    // 1. Reiniciar estado para la nueva petición
-    _current_request.start_addr = start_addr; 
-    _current_request.size = 0; 
-    _SDlastRowReadSize = 0; 
-    //_lastSizeReadRequestSended = 0;
-
-    if (size > MAX_MODBUS_REGS) return _current_request; 
-
-    // 2. Configurar el contexto para el callback
-    // todo esto no debe ir aqui 
-    InterpreterContext ctx; 
-    ctx.instance = this; 
-    ctx.start_addr = start_addr; 
-    ctx.size = size; 
-    
-    // 3. Leer el archivo. El SDManager llamará a staticCallback -> handleLine por cada línea
-    if (_sd->isReady()) {
-        if(!_sd->getAllLines(_setupFile.c_str(), staticCallback, &ctx)){
-                Serial.print("Error puede estar aqui"); 
-        }
-    }
-
-    // 4. Una vez finalizada la lectura, actualizamos el registro de control
-    //_lastSizeReadRequestSended = current_request.size;
-    
-    return _current_request; 
-
-    
-}
-*/
 // Devuelve una estructura con la toda la informacion para generar los resultados. 
 CompleteDataRegBuffer EnergyMeterRegInterpreter::getDataProcess(const uint16_t* datos, const uint16_t size) {
     CompleteDataRegBuffer res;
@@ -329,40 +292,6 @@ CompleteDataRegBuffer EnergyMeterRegInterpreter::getDataProcess(const uint16_t* 
     return res; 
 }
 
-
-/*
-//TODO: para poder hacer este splitString se tiene que cumplir con el formato de registro ADDR;FORMAT;RD_WR;UNIT;NOTE; 
-// como minimo NUM_COL_REG_EM750 valores , sino error
-bool EnergyMeterRegInterpreter::splitString(char* linea, char div_char, reg_EM_750 &resultado) {
-    if (linea == nullptr) return false;
-
-    int col = 0;
-    bool dentroDeComillas = false;
-    char* ptr = linea;
-    
-    // El primer campo empieza al inicio de la línea
-    resultado.data[col++] = ptr;
-
-    while (*ptr != '\0') {
-        if (*ptr == '"') {
-            dentroDeComillas = !dentroDeComillas;
-        } 
-        else if (*ptr == div_char && !dentroDeComillas) {
-            // Encontramos un divisor: lo convertimos en fin de cadena
-            *ptr = '\0'; 
-            
-            // El siguiente campo empieza justo después
-            if (col < NUM_COL_REG_EM750) {
-                resultado.data[col++] = ptr + 1;
-            }
-        }
-        ptr++;
-    }
-
-    // Opcional: Podrías añadir lógica aquí para limpiar comillas de cada resultado.data[i]
-    return (col == NUM_COL_REG_EM750);
-}
-*/
 
 // funcion auxiliar para interpretar registros modbus de 16 bits a float
 float EnergyMeterRegInterpreter::getFloatConversion(const uint16_t* data){
@@ -509,3 +438,80 @@ stringDataEM EnergyMeterRegInterpreter::getStringData() {
 
     return res;
 }
+
+void EnergyMeterRegInterpreter::loadParametersMapRegister() {
+    // Definimos el parser para 2 columnas de tipo string ("ss")
+    // Columna 0: Nombre del parámetro, Columna 1: Valor
+    CSV_Parser cp("sssss", true, ';');
+
+    // Usamos withFile para obtener el stream de forma segura
+    _sd->withFile(_setupFile.c_str(), [](Stream& file, void* arg) {
+        CSV_Parser* parser = (CSV_Parser*)arg;
+        
+        // Leemos solo hasta LINE_MAP_START (línea 4)
+        for (int i = 0; i < LINE_MAP_START; i++) {
+            if (file.available()) {
+                String line = file.readStringUntil('\n');
+                if (line.length() > 0) {
+                    line += "\n";
+                    // Alimentamos el parser con las líneas de configuración
+                    *parser << line.c_str();
+                }
+            }
+        }
+    }, &cp);
+
+    // Una vez cerrado el archivo, extraemos los valores del objeto cp
+    // CSV_Parser asume que la primera línea leída son las cabeceras.
+    // Si tu archivo empieza con "Log Interval (ms);5000", esa será la cabecera.
+    // Para evitar problemas, usaremos los índices de columna [0] y [1].
+    
+    char **names  = (char**)cp[ (int)0 ]; // Primera columna
+    char **values = (char**)cp[ (int)1 ]; // Segunda columna
+
+    if (values != nullptr && cp.getRowsCount() >= 3) {
+        // cp.getRowsCount() devuelve las filas SIN contar la cabecera.
+        // Fila 0 (Header): Log Interval (ms); 5000
+        // Fila 1: New File... ; minute
+        // Fila 2: Max files ; 30
+
+        // 1. Log Interval (está en la cabecera si es la primera línea, o fila 0 si hay header)
+        // Como el parser es un poco especial con las cabeceras, 
+        // lo más seguro es acceder a las filas disponibles:
+        
+        if (values[0]) {
+            strncpy(_log_interval, values[0], MAX_TITLES_SIZE - 1);
+            _log_interval[MAX_TITLES_SIZE - 1] = '\0';
+        }
+        
+        if (values[1]) {
+            strncpy(_new_file, values[1], MAX_TITLES_SIZE - 1);
+            _new_file[MAX_TITLES_SIZE - 1] = '\0';
+        }
+
+        if (values[2]) {
+            strncpy(_max_files, values[2], MAX_TITLES_SIZE - 1);
+            _max_files[MAX_TITLES_SIZE - 1] = '\0';
+        }
+    }
+}
+
+Parameters EnergyMeterRegInterpreter::getParameters(){
+    Parameters res; 
+    res.log_interval = _log_interval;
+    res.new_file = _new_file; 
+    res.max_files = _max_files; 
+    return res; 
+}
+
+
+/*
+        while (file.available()) {
+            String line = file.readStringUntil('\n');
+            if (line.length() > 0) {
+                line += "\n";
+                cp << line.c_str();
+            }
+        }
+*/
+
