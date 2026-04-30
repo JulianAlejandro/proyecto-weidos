@@ -3,6 +3,7 @@
 #define ENERGY_METER_INTERPRETER_H
 
 #include "../SDManager.h"
+#include <CSV_Parser.h>
 //#include <vector>
 
 #define NUM_COL_REG_EM750 5
@@ -94,11 +95,13 @@ private:
     char _new_file[MAX_TITLES_SIZE]; 
     char _max_files[MAX_TITLES_SIZE];
    
-    bool splitString(char* linea, char div_char, reg_EM_750 &resultado); // funcion de apoyo para obtener valores de registro en Strings
+    //bool splitString(char* linea, char div_char, reg_EM_750 &resultado); // funcion de apoyo para obtener valores de registro en Strings
     int getFormatSize(coded_format f); // Convierte un enum en valores de int para obtener el tamaño de cada registro
 
-    void handleLine(char* line, uint16_t start, uint16_t size); // funciones para callback
-    static void staticCallback(const char* line, void* context);
+    //void handleLine(char* line, uint16_t start, uint16_t size); // funciones para callback
+    //static void staticCallback(const char* line, void* context);
+
+    void processParserData(CSV_Parser& cp, uint16_t start, uint16_t size);
 
 public:
     // Constructor
@@ -125,9 +128,9 @@ public:
     static float getFloatConversion(const uint16_t* data);
 
     //OBTENCION DE PARAMETROS EXISTENTES DENTRO DEL FICHERO EM750map.csv
-    const char* getLogInterval() { return _log_interval; }
-    const char* getNewFile() { return _new_file; }
-    const char* getMaxFiles() { return _max_files; }
+    //const char* getLogInterval() { return _log_interval; }
+    //const char* getNewFile() { return _new_file; }
+    //const char* getMaxFiles() { return _max_files; }
 
     //TODO funciones relacionadas con la MODBUS REQUEST, EN UN FUTURO REFACTORIZAR 
     //bool modbusRequestByFile(char* filename);

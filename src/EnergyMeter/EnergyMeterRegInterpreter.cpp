@@ -1,7 +1,18 @@
 #include "EnergyMeterRegInterpreter.h" // cambiar nombre a csv functionalities
 #include <Arduino.h>
 
+/*
 struct InterpreterContext {
+    EnergyMeterRegInterpreter* instance;
+    uint16_t start_addr;
+    uint16_t size;
+};
+
+
+*/
+
+// Estructura para pasar datos al callback de Stream
+struct StreamContext {
     EnergyMeterRegInterpreter* instance;
     uint16_t start_addr;
     uint16_t size;
@@ -30,7 +41,7 @@ int EnergyMeterRegInterpreter::begin(){
     */
 }
 
-
+/*
 void EnergyMeterRegInterpreter::staticCallback(const char* line, void* context) {
     InterpreterContext* ctx = (InterpreterContext*)context;
 
@@ -45,7 +56,8 @@ void EnergyMeterRegInterpreter::staticCallback(const char* line, void* context) 
     // Ahora pasamos el buffer (que es char*) a handleLine
     ctx->instance->handleLine(buffer, ctx->start_addr, ctx->size);
 }
-
+*/
+/*
 void EnergyMeterRegInterpreter::handleLine(char* line, uint16_t start, uint16_t size) {
     if (line == nullptr || line[0] == '\0') return;
 
@@ -102,11 +114,155 @@ void EnergyMeterRegInterpreter::handleLine(char* line, uint16_t start, uint16_t 
         }
     }
 }
+*/
 
+void EnergyMeterRegInterpreter::processParserData(CSV_Parser& cp, uint16_t start, uint16_t size) {
+    // 1. Obtener punteros y VERIFICAR que no sean NULL
+    int32_t *addrs = (int32_t*)cp["Address"];
+    char **formats = (char**)cp["Format"];
+    char **names = (char**)cp["Name"];
+
+    // Si el CSV usa nombres distintos, cp[] devuelve NULL. 
+    // Verifica que estos nombres coincidan EXACTAMENTE con la cabecera de tu CSV
+    if (addrs == nullptr || formats == nullptr || names == nullptr) {
+        Serial.println("Error: No se encontraron las columnas en el CSV. Revisa las cabeceras.");
+        return;
+    }
+
+    int totalRows = cp.getRowsCount();
+    _SDlastRowReadSize = 0; // Reiniciamos contador de filas encontradas en el rango
+
+    for (int i = 0; i < totalRows; i++) {
+        // Validación de seguridad para el índice
+        uint16_t addr = (uint16_t)addrs[i];
+
+        if (addr >= start && addr < (start + size)) {
+            
+            // Verificamos que no nos pasemos del buffer de la clase
+            if (_SDlastRowReadSize >= MAX_MODBUS_REGS) {
+                Serial.println("Advertencia: Se alcanzó el límite MAX_MODBUS_REGS");
+                break;
+            }
+
+            coded_format fmtEnum = stringToFormat(formats[i]);
+            
+            if (fmtEnum != FORMAT_UNKNOWN) {
+                int idx = _SDlastRowReadSize;
+                
+                _SDformatBuffer[idx] = fmtEnum;
+                _SDaddrsBuffer[idx] = addr;
+                
+                // Copia segura del título
+                if (names[i] != nullptr) {
+                    strncpy(_titulos[idx], names[i], MAX_TITLES_SIZE - 1);
+                    _titulos[idx][MAX_TITLES_SIZE - 1] = '\0';
+                } else {
+                    strcpy(_titulos[idx], "Unknown");
+                }
+
+                // Actualizar el tamaño total de registros Modbus (16-bit units)
+                _current_request.size += getFormatSize(fmtEnum);
+                
+                _SDlastRowReadSize++;
+            }
+        }
+    }
+    
+    Serial.print("Proceso finalizado. Filas en rango: ");
+    Serial.println(_SDlastRowReadSize);
+}
+
+/*
+void EnergyMeterRegInterpreter::processParserData(CSV_Parser& cp, uint16_t start, uint16_t size) {
+    int32_t *addrs = (int32_t*)cp["Address"];
+    char **formats = (char**)cp["Format"];
+    char **names = (char**)cp["Name"];
+    int totalRows = cp.getRowsCount();
+
+    for (int i = 0; i < totalRows; i++) {
+        uint16_t addr = (uint16_t)addrs[i];
+
+        if (addr >= start && addr < (start + size)) {
+            coded_format fmtEnum = stringToFormat(formats[i]);
+            
+            if (fmtEnum != FORMAT_UNKNOWN && _SDlastRowReadSize < MAX_MODBUS_REGS) {
+                int idx = _SDlastRowReadSize;
+                
+                _SDformatBuffer[idx] = fmtEnum;
+                _SDaddrsBuffer[idx] = addr;
+                
+                strncpy(_titulos[idx], names[i], MAX_TITLES_SIZE - 1);
+                _titulos[idx][MAX_TITLES_SIZE - 1] = '\0';
+
+                _current_request.size += getFormatSize(fmtEnum);
+                
+                _SDlastRowReadSize++;
+                
+            }
+            
+        }
+    }
+}
+*/
+
+EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
+    _current_request.start_addr = start_addr;
+    _current_request.size = 0;
+    _SDlastRowReadSize = 0;
+
+    StreamContext ctx = {this, start_addr, size};
+        
+    // Usamos withFile para obtener el Stream del archivo
+    _sd->withFile(_setupFile.c_str(), [](Stream& file, void* arg) {
+        StreamContext* sc = (StreamContext*)arg;
+        
+        // 1. Extraer parámetros iniciales (las primeras líneas que no son la tabla)
+        // Leemos hasta encontrar la cabecera "Address"
+        /*
+        while (file.available()) {
+            String line = file.readStringUntil('\n');
+            line.trim();
+            if (line.startsWith("Address")) break; 
+            
+            // Aquí puedes llamar a una función que guarde Log Interval, etc.
+            //sc->instance->handleConfigLine(line); 
+        }*/
+
+        for (int i = 0; i < 4; i++) {
+            if (file.available()) {
+            file.readStringUntil('\n'); 
+             }
+        }
+
+    
+        // 2. Usar CSV_Parser para el resto del archivo (la tabla)
+        // "Lssss" -> Address(L), Format(s), Unit(s), Name(s), Log(s)
+        CSV_Parser cp("Lssss", true, ';');
+
+        // Alimentamos el parser con el resto del stream
+        while (file.available()) {
+            String line = file.readStringUntil('\n');
+            if (line.length() > 0) {
+                line += "\n";
+                cp << line.c_str();
+            }
+        }
+
+        // 3. Procesar los resultados del Parser y filtrarlos por rango
+        sc->instance->processParserData(cp, sc->start_addr, sc->size);
+
+    }, &ctx);
+        
+    return _current_request;
+}
+
+/*
 // TODO Modificar en donde esta el setup 
 // TODO es importante mejorar esto teniendo en cuenta TODO el mapa de registros
 // Esta funcion inicia una solicitud de interpretacion de un rango de direcciones. 
 EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
+
+    
     // 1. Reiniciar estado para la nueva petición
     _current_request.start_addr = start_addr; 
     _current_request.size = 0; 
@@ -133,8 +289,10 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
     //_lastSizeReadRequestSended = current_request.size;
     
     return _current_request; 
-}
 
+    
+}
+*/
 // Devuelve una estructura con la toda la informacion para generar los resultados. 
 CompleteDataRegBuffer EnergyMeterRegInterpreter::getDataProcess(const uint16_t* datos, const uint16_t size) {
     CompleteDataRegBuffer res;
@@ -171,6 +329,8 @@ CompleteDataRegBuffer EnergyMeterRegInterpreter::getDataProcess(const uint16_t* 
     return res; 
 }
 
+
+/*
 //TODO: para poder hacer este splitString se tiene que cumplir con el formato de registro ADDR;FORMAT;RD_WR;UNIT;NOTE; 
 // como minimo NUM_COL_REG_EM750 valores , sino error
 bool EnergyMeterRegInterpreter::splitString(char* linea, char div_char, reg_EM_750 &resultado) {
@@ -202,7 +362,7 @@ bool EnergyMeterRegInterpreter::splitString(char* linea, char div_char, reg_EM_7
     // Opcional: Podrías añadir lógica aquí para limpiar comillas de cada resultado.data[i]
     return (col == NUM_COL_REG_EM750);
 }
-
+*/
 
 // funcion auxiliar para interpretar registros modbus de 16 bits a float
 float EnergyMeterRegInterpreter::getFloatConversion(const uint16_t* data){
@@ -349,8 +509,3 @@ stringDataEM EnergyMeterRegInterpreter::getStringData() {
 
     return res;
 }
-
-// funciones nuevas asociadas a la lectuera de la solicitud modbus. 
-
-// primero leemos la solicitud modbus, almacenamos los valores
-

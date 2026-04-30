@@ -1,61 +1,4 @@
-#include <CSV_Parser.h>
-#include <SD.h>
 
-File myFile;
-String fileName = "EM750map.csv";
-
-void setup() {
-  Serial.begin(115200);
-  while(!Serial); // Esperar a que el puerto serie esté listo
-
-  if (!SD.begin()) {
-    Serial.println("Error: SD falló.");
-    while (true);
-  }
-
-  myFile = SD.open(fileName);
-  if (!myFile) {
-    Serial.println("Error: No se pudo abrir el archivo.");
-    return;
-  }
-
-  // 1. Creamos el parser configurando el formato y el delimitador ';'
-  // "Lssss" -> Address (Long), Format (string), Unit (string), Name (string), Log (string)
-  CSV_Parser cp("Lssss", true, ';');
-
-  // 2. Saltamos las primeras 4 líneas de metadatos manualmente
-  for (int i = 0; i < 4; i++) {
-    if (myFile.available()) {
-      myFile.readStringUntil('\n'); 
-    }
-  }
-
-  // 3. Alimentamos el parser con el resto del archivo
-  while (myFile.available()) {
-    String line = myFile.readStringUntil('\n');
-    line += "\n"; // Aseguramos el salto de línea para el parser
-    cp << line.c_str(); 
-  }
-  myFile.close();
-
-  // 4. Accedemos a los datos
-  int32_t *addresses = (int32_t*)cp["Address"];
-  char **names = (char**)cp["Name"];
-  int totalRows = cp.getRowsCount();
-
-  Serial.println("--- Registros entre 19000 y 19020 ---");
-  for (int row = 0; row < totalRows; row++) {
-    if (addresses[row] >= 19000 && addresses[row] <= 19020) {
-      Serial.print("Addr: ");
-      Serial.print(addresses[row]);
-      Serial.print(" - Nombre: ");
-      Serial.println(names[row]);
-    }
-  }
-}
-
-void loop() {}
-/*
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
 #include <RTClib.h>
@@ -120,8 +63,17 @@ void setup() {
     while(1);
   }
 
-  regInterpreter.startNewRequest(19000, 120);
+  req = regInterpreter.startNewRequest(19000, 120);
+  
+  Serial.print("La start addr: ");
+  Serial.println(req.start_addr); 
 
+  Serial.print("La size:");
+  Serial.println(req.size);
+
+  //CompleteDataRegBuffer res = regInterpreter.
+
+  /*
   Serial.print("log interval:"); 
   Serial.println(regInterpreter.getLogInterval());
 
@@ -130,7 +82,7 @@ void setup() {
 
   Serial.print("Max files:"); 
   Serial.println(regInterpreter.getMaxFiles());
-  
+  */
 
   //if (! rtc.begin()) { // todo while(1) bloquea al micro, cambiar
   //   Serial.print("Fallo RTC");
@@ -254,7 +206,69 @@ void crear_nueva_sesion_log() {
   //  }
 }
 
+
+
+
+/*
+#include <CSV_Parser.h>
+#include <SD.h>
+
+File myFile;
+String fileName = "EM750map.csv";
+
+void setup() {
+  Serial.begin(115200);
+  while(!Serial); // Esperar a que el puerto serie esté listo
+
+  if (!SD.begin()) {
+    Serial.println("Error: SD falló.");
+    while (true);
+  }
+
+  myFile = SD.open(fileName);
+  if (!myFile) {
+    Serial.println("Error: No se pudo abrir el archivo.");
+    return;
+  }
+
+  // 1. Creamos el parser configurando el formato y el delimitador ';'
+  // "Lssss" -> Address (Long), Format (string), Unit (string), Name (string), Log (string)
+  CSV_Parser cp("Lssss", true, ';');
+
+  // 2. Saltamos las primeras 4 líneas de metadatos manualmente
+  for (int i = 0; i < 4; i++) {
+    if (myFile.available()) {
+      myFile.readStringUntil('\n'); 
+    }
+  }
+
+  // 3. Alimentamos el parser con el resto del archivo
+  while (myFile.available()) {
+    String line = myFile.readStringUntil('\n');
+    line += "\n"; // Aseguramos el salto de línea para el parser
+    cp << line.c_str(); 
+  }
+  myFile.close();
+
+  // 4. Accedemos a los datos
+  int32_t *addresses = (int32_t*)cp["Address"];
+  char **names = (char**)cp["Name"];
+  int totalRows = cp.getRowsCount();
+
+  Serial.println("--- Registros entre 19000 y 19020 ---");
+  for (int row = 0; row < totalRows; row++) {
+    if (addresses[row] >= 19000 && addresses[row] <= 19020) {
+      Serial.print("Addr: ");
+      Serial.print(addresses[row]);
+      Serial.print(" - Nombre: ");
+      Serial.println(names[row]);
+    }
+  }
+}
+
+void loop() {}
 */
+
 
 /*
 
