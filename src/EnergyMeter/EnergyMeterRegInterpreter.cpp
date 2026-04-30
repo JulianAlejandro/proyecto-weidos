@@ -1,4 +1,4 @@
-#include "EnergyMeterRegInterpreter.h"
+#include "EnergyMeterRegInterpreter.h" // cambiar nombre a csv functionalities
 #include <Arduino.h>
 
 struct InterpreterContext {
@@ -46,19 +46,42 @@ void EnergyMeterRegInterpreter::staticCallback(const char* line, void* context) 
     ctx->instance->handleLine(buffer, ctx->start_addr, ctx->size);
 }
 
-
-
 void EnergyMeterRegInterpreter::handleLine(char* line, uint16_t start, uint16_t size) {
-    // 1. Verificación básica (ya no usamos isdigit aquí porque splitString lo hará)
     if (line == nullptr || line[0] == '\0') return;
 
     reg_EM_750 aux;
+    // splitString divide la línea en columnas usando el delimitador ';'
     if (splitString(line, ';', aux)) {
-        // Validación: ¿Es el primer campo un número? (La dirección)
+        
+        // 1. COMPROBACIÓN DE PARÁMETROS DE CONFIGURACIÓN
+        // Usamos aux.data[0] que corresponde a la primera columna (NAME en parámetros, ADDR en registros)
+        
+        if (strcasecmp(aux.data[0], "Log Interval (ms)") == 0) {
+            // Copiamos el valor que está en la segunda columna (VALUE / FORMAT)
+            strncpy(_log_interval, aux.data[1], MAX_TITLES_SIZE - 1);
+            _log_interval[MAX_TITLES_SIZE - 1] = '\0';
+            return; // Si es un parámetro, no es un registro Modbus, podemos salir
+        }
+        
+        if (strcasecmp(aux.data[0], "New File (minute/hour/day/month)") == 0) {
+            strncpy(_new_file, aux.data[1], MAX_TITLES_SIZE - 1);
+            _new_file[MAX_TITLES_SIZE - 1] = '\0';
+            return;
+        }
+        
+        if (strcasecmp(aux.data[0], "Max files") == 0) {
+            strncpy(_max_files, aux.data[1], MAX_TITLES_SIZE - 1);
+            _max_files[MAX_TITLES_SIZE - 1] = '\0';
+            return;
+        }
+
+        // 2. COMPROBACIÓN DE REGISTROS MODBUS
+        // Si no fue un parámetro, verificamos si es una fila de registro (el primer campo debe ser numérico)
         if (!isdigit(aux.data[ADDR][0])) return;
 
         uint16_t addr = (uint16_t)atoi(aux.data[ADDR]);
 
+        // Verificar si la dirección está dentro del rango solicitado
         if (addr >= start && addr < (start + size)) {
             coded_format formatEnum = stringToFormat(aux.data[FORMAT]);
 
@@ -68,17 +91,17 @@ void EnergyMeterRegInterpreter::handleLine(char* line, uint16_t start, uint16_t 
                 _SDformatBuffer[i] = formatEnum;
                 _SDaddrsBuffer[i] = addr;
                 
-                // Copiamos el título a la matriz fija
+                // Copiamos el título/nota del registro (Columna NOTE)
                 strncpy(_titulos[i], aux.data[NOTE], MAX_TITLES_SIZE - 1);
                 _titulos[i][MAX_TITLES_SIZE - 1] = '\0'; 
 
+                // Sumamos el tamaño que ocupará este dato en la petición Modbus
                 _current_request.size += getFormatSize(formatEnum);
                 _SDlastRowReadSize++;
             }
         }
     }
 }
-
 
 // TODO Modificar en donde esta el setup 
 // TODO es importante mejorar esto teniendo en cuenta TODO el mapa de registros
@@ -327,69 +350,7 @@ stringDataEM EnergyMeterRegInterpreter::getStringData() {
     return res;
 }
 
-/*
-stringDataEM EnergyMeterRegInterpreter::getStringData() {
-    stringDataEM res;
-    res.size = 0;
+// funciones nuevas asociadas a la lectuera de la solicitud modbus. 
 
-    // Recorremos los registros procesados en la última petición
-    for (int i = 0; i < _SDlastRowReadSize; i++) {
-        
-        // De momento solo gestionamos FLOAT como solicitaste
-        if (_completeDataR[i].format == FLOAT) {
-            // 1. Convertimos los 2 registros de 16 bits a un float real
-            float f_data = EnergyMeterRegInterpreter::getFloatConversion(_completeDataR[i].data);
-            
-            // 2. Convertimos el float a cadena de texto (char array)
-            // "%.2f" limita a 2 decimales. Puedes usar "%f" para más precisión.
-            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2f", f_data);
-       
-        } else if(_completeDataR[i].format == SHORT) {
-            // SHORT Tamaño 1 
-            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", _completeDataR[i].data);
-            
-        } else if(_completeDataR[i].format == INT) {
-                //uint32_t combinado = ((uint32_t)data[0] << 16) | data[1]; // TODO depende de si es little endian o Big endian
+// primero leemos la solicitud modbus, almacenamos los valores
 
-            uint32_t combinado = ((uint32_t)_completeDataR[i].buffer[0] << 16) | _completeDataR[i].buffer[1];
-            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", combinado);
-
-        } else if(_completeDataR[i].format == UINT) {
-
-            uint32_t combinado = ((uint32_t)_completeDataR[i].buffer[0] << 16) | _completeDataR[i].buffer[1];
-            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", combinado);
-
-        } else if(_completeDataR[i].format == USHORT){
-
-            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", _completeDataR[i].data);
-
-        } else if(_completeDataR[i].format == BYTE){
-
-            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", _completeDataR[i].data);
-
-        } else if(_completeDataR[i].format == LONG64){
-
-            uint64_t combinado = ((uint64_t)_completeDataR[i].buffer[0] << 48) | ((uint64_t)_completeDataR[i].buffer[1] << 32) | ((uint64_t)_completeDataR[i].buffer[2] << 16) | ((uint16_t)_completeDataR[i].buffer[3]);
-
-        } else if(_completeDataR[i].format == DFLOAT){
-
-            snprintf(_netaData[i], MAX_TITLES_SIZE, "%.2d", _completeDataR[i].data);
-
-        } else if(_completeDataR[i].format == STRING){
-
-
-
-        } else {
-            // Para otros formatos (futuro), de momento ponemos un placeholder o vacío
-            snprintf(_netaData[i], MAX_TITLES_SIZE, "n/a");
-        }
-
-        // 3. Asignamos el puntero de nuestra matriz persistente al buffer de salida
-        res.buffer[i] = _netaData[i];
-        res.size++;
-    }
-
-    return res;
-}
-
-*/

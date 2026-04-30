@@ -11,7 +11,7 @@
 
 #define MAX_DATA_SIZE 4 // numero maximo de tamaño que puede tener un dato en el mapa de registros 
 
-#define SETUP_FILE "/EM_map.txt"
+#define SETUP_FILE "/EM750map.csv"
 
 // size number reg 16 bits
 #define SIZE_FLOAT   2 // 2 reg 16 bits
@@ -22,10 +22,6 @@
 #define SIZE_USHORT  1
 #define SIZE_BYTE    1
 #define SIZE_DFLOAT  1
-
-// TODO 
-//#define MAP_FILE_NAME "/example2.txt"
-
 
 enum coded_format { FORMAT_UNKNOWN, FLOAT, SHORT, INT, STRING, USHORT, UINT, BYTE, LONG64, DFLOAT };
 
@@ -49,6 +45,7 @@ struct CompleteDataRegBuffer{
 
 // TODO pensar en si es aconsejable esto
 enum index_reg_EM750 { ADDR, FORMAT, RD_WR, UNIT, NOTE };
+//enum index_parameters { NAME, VALUE };
 
 //todo ya
 struct reg_EM_750 { 
@@ -69,7 +66,7 @@ struct stringDataEM{
 typedef void (*TitleHandler)(const char* title, void* arg);
 
 //TODO String _setup cambiar
-class EnergyMeterRegInterpreter {
+class EnergyMeterRegInterpreter { // TODO Esta clase tendra que cambiar de nombre a algo que gestione CSVs
 
 private:
     SDManager* _sd = nullptr; 
@@ -89,8 +86,14 @@ private:
     completeDataReg _completeDataR[MAX_MODBUS_REGS]; // 125 x (4x2 + 4) = 1500 bytes aprox
     char _netaData[MAX_MODBUS_REGS][MAX_TITLES_SIZE];
 
-    uint16_t _SDlastRowReadSize; // size del numero de registros que se quieren leer en una request.     
+    uint16_t _SDlastRowReadSize; // size del numero de registros que se quieren leer en una request. 
 
+    //TODO valorar donde poner esto
+    // estos son almacenes para mantener la persistencia de datos obtenidos en startNewRequest para estos parametros 
+    char _log_interval[MAX_TITLES_SIZE]; 
+    char _new_file[MAX_TITLES_SIZE]; 
+    char _max_files[MAX_TITLES_SIZE];
+   
     bool splitString(char* linea, char div_char, reg_EM_750 &resultado); // funcion de apoyo para obtener valores de registro en Strings
     int getFormatSize(coded_format f); // Convierte un enum en valores de int para obtener el tamaño de cada registro
 
@@ -120,6 +123,14 @@ public:
 
     // TODO analizar si es necesario interpretar que es little endian o no
     static float getFloatConversion(const uint16_t* data);
+
+    //OBTENCION DE PARAMETROS EXISTENTES DENTRO DEL FICHERO EM750map.csv
+    const char* getLogInterval() { return _log_interval; }
+    const char* getNewFile() { return _new_file; }
+    const char* getMaxFiles() { return _max_files; }
+
+    //TODO funciones relacionadas con la MODBUS REQUEST, EN UN FUTURO REFACTORIZAR 
+    //bool modbusRequestByFile(char* filename);
 
 };
 
