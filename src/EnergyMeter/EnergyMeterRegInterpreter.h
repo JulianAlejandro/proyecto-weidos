@@ -13,7 +13,7 @@
 #define MAX_DATA_SIZE 4 // numero maximo de tamaño que puede tener un dato en el mapa de registros 
 #define LINE_MAP_START 4
 
-#define SETUP_FILE "/EM750map.csv"
+#define MAP_FILE "/EM750map.csv"
 
 // size number reg 16 bits
 #define SIZE_FLOAT   2 // 2 reg 16 bits

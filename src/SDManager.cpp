@@ -108,6 +108,7 @@ bool SDManager::createDirectory(const char* path) {
     return SD.mkdir(path);
 }
 
+/*
 //devuelve cada linea del fichero en un callback
 bool SDManager::getAllLines(const char* path, LineCallback callback, void* context) {
     if (!_initialized) return false;
@@ -127,6 +128,7 @@ bool SDManager::getAllLines(const char* path, LineCallback callback, void* conte
     file.close();
     return true;
 }
+*/
 
 /*
 File SDManager::getFileStream(const char* path) {

@@ -1,4 +1,4 @@
-/*
+
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
 #include <RTClib.h>
@@ -8,7 +8,9 @@
 //#include "src/EnergyMeter/EnergyMeter750.h"
 #include "src/SDManager.h"
 
-#include "src/EnergyMeter/EnergyMeterRegInterpreter.h"
+//#include "src/EnergyMeter/EnergyMeterRegInterpreter.h"
+#include "ModbusRequestCSV.h"
+
 //#include "src/ConfigManager.h"
 
 // --- Configuración de Red ---
@@ -25,9 +27,10 @@
 //---Objetos de Gestion 
 SDManager sd;  // gestion SD compartido
 //Datalogger datalogger(&sd); // usa SD para hacer LOGs
-EnergyMeterRegInterpreter regInterpreter(&sd); // usa SD para interpretar mapa de memoria de EM
+//EnergyMeterRegInterpreter regInterpreter(&sd); // usa SD para interpretar mapa de memoria de EM
 //ConfigManager cfgManager(&sd); // usa SD para leer JSON con configuracion basica de medida de EM. 
 //EnergyMeter750 energy_meter(1); //TODO usa EM para leer por modbus TCP o RTU Slave (de momento solo modbus)
+ModbusRequestCSV p(&sd);
 
 //----codigo a revisar 
 //#define SLAVE_ADDRESS 1 // A eliminar posiblemente MAL
@@ -35,17 +38,19 @@ EnergyMeterRegInterpreter regInterpreter(&sd); // usa SD para interpretar mapa d
 unsigned long anteriorMillisModbus = 0; // Almacena la última vez que leíste
 unsigned long anteriorMillisArchivo = 0;
 
-EM_request req;              // El contador que quieres incrementar
+//EM_request req;              // El contador que quieres incrementar
 
 void lectura_modbus();
 void crear_nueva_sesion_log();
 
-titlesBuffer misTitulos;
+//titlesBuffer misTitulos;
 //DeviceConfig json_cfg; 
 
 void setup() {
   
   Serial.begin(115200);
+
+  Serial.println("hola mundo");
 
   if (!sd.begin()) {
     Serial.println(F("Error: No se pudo iniciar la SD"));
@@ -57,15 +62,26 @@ void setup() {
   //  while(1);
   //}
  
-  if(! regInterpreter.begin()){
-    Serial.println("Fallo reg interpretert");
+  //if(! regInterpreter.begin()){
+  //  Serial.println("Fallo reg interpretert");
+  //  while(1);
+ // }
+
+  if(! p.begin()){
+    Serial.println("Fallo reg modbus request");
     while(1);
   }
 
-  req = regInterpreter.startNewRequest(19000, 120);
-  regInterpreter.loadParametersMapRegister(); 
+  if(!p.loadFromSDParameters()){
+    Serial.println("fallo load");    
+  }
 
-  Parameters param = regInterpreter.getParameters();
+  Serial.println(p.getDeviceName());
+  Serial.println(p.getIpAdress()); 
+  //req = regInterpreter.startN;ewRequest(19000, 120);
+  //regInterpreter.loadParametersMapRegister(); 
+
+  //Parameters param = regInterpreter.getParameters();
   
   //Serial.print("La start addr: ");
   //Serial.println(req.start_addr); 
@@ -75,14 +91,14 @@ void setup() {
 
   //CompleteDataRegBuffer res = regInterpreter.
  
-  Serial.print("log interval:"); 
-  Serial.println(param.log_interval);
-
-  Serial.print("New file:"); 
-  Serial.println(param.new_file);
-
-  Serial.print("Max files:"); 
-  Serial.println(param.max_files);
+  //Serial.print("log interval:"); 
+  //Serial.println(param.log_interval);
+//
+  //Serial.print("New file:"); 
+  //Serial.println(param.new_file);
+//
+  //Serial.print("Max files:"); 
+  //Serial.println(param.max_files);
   
 
   //if (! rtc.begin()) { // todo while(1) bloquea al micro, cambiar
@@ -206,7 +222,7 @@ void crear_nueva_sesion_log() {
   //      Serial.println("Error al crear el archivo por timestamp");
   //  }
 }
-*/
+
 
 
 
@@ -316,7 +332,7 @@ void loop() {
 
 */
 
-
+/*
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
 #include <RTClib.h>
@@ -404,12 +420,12 @@ void setup() {
   //json_cfg = cfgManager.getDeviceConfig(); // obtenemos estructura de configuracion JSON
 
   //req = regInterpreter.startNewRequest(19000, 10);
-  /*
-  Serial.print("val json_cfg start addr: "); 
-  Serial.println(json_cfg.start_addr);
-  Serial.print("val json_cfg start size: ");
-  Serial.println(json_cfg.length);
-*/
+  
+  //Serial.print("val json_cfg start addr: "); 
+  //Serial.println(json_cfg.start_addr);
+  //Serial.print("val json_cfg start size: ");
+  //Serial.println(json_cfg.length);
+
   req = regInterpreter.startNewRequest(19000, 10);
 
   Serial.print("valores de req: ");
@@ -498,3 +514,4 @@ void crear_nueva_sesion_log() {
         Serial.println("Error al crear el archivo por timestamp");
     }
 }
+*/

@@ -19,7 +19,7 @@ struct StreamContext {
 // Constructor: Inicializamos el puntero al manager de la SD
 EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager) {
     _sd = sdManager;
-    _setupFile = SETUP_FILE;
+    //_setupFile = SETUP_FILE;
 }
 
 int EnergyMeterRegInterpreter::begin(){
@@ -211,7 +211,7 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
     StreamContext ctx = {this, start_addr, size};
         
     // Usamos withFile para obtener el Stream del archivo
-    _sd->withFile(_setupFile.c_str(), [](Stream& file, void* arg) {
+    _sd->withFile(MAP_FILE, [](Stream& file, void* arg) {
         StreamContext* sc = (StreamContext*)arg;
         
         // 1. Extraer parámetros iniciales (las primeras líneas que no son la tabla)
@@ -445,7 +445,7 @@ void EnergyMeterRegInterpreter::loadParametersMapRegister() {
     CSV_Parser cp("sssss", true, ';');
 
     // Usamos withFile para obtener el stream de forma segura
-    _sd->withFile(_setupFile.c_str(), [](Stream& file, void* arg) {
+    _sd->withFile(MAP_FILE, [](Stream& file, void* arg) {
         CSV_Parser* parser = (CSV_Parser*)arg;
         
         // Leemos solo hasta LINE_MAP_START (línea 4)

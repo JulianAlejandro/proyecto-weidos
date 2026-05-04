@@ -6,20 +6,27 @@
 
 //clase momentanea que accde a SD para devolver valores de Modbus request. 
 #define MAX_TITLES_SIZE 32 // TODO cambiatar esto de nombre
+#define MODBUS_REQ_FILE "MBReq.csv"
 
+#define FIRST_BLOCK 3
 
-struct ModbusReqParameters{
-  char device_name[MAX_TITLES_SIZE];
-  char ip_address[MAX_TITLES_SIZE];
-};
 
 class ModbusRequestCSV { // TODO Esta clase tendra que cambiar de nombre a algo que gestione CSVs
 
 private:
   SDManager* _sd = nullptr;
+
+  char _device_name[MAX_TITLES_SIZE];
+  char _ip_address[MAX_TITLES_SIZE];
+
 public:
   ModbusRequestCSV(SDManager* sdManager); 
   bool begin();
+
+  bool loadFromSDParameters();
+
+  char* getDeviceName(){return _device_name;}
+  char* getIpAdress(){return _ip_address;} 
 
 };
 
