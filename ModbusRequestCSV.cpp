@@ -87,103 +87,50 @@ bool ModbusRequestCSV::loadFromSDParameters() {
     return false;
 }
 
-/*
-bool ModbusRequestCSV::loadFromSDParameters() {
-    // Definimos el formato: 5 columnas de strings
-    CSV_Parser cp("sssss", true, ';');
-    bool flag = false; 
-    flag = _sd->withFile(MODBUS_REQ_FILE, [](Stream& file, void* arg) {
+
+Struct_MBRequest ModbusRequestCSV::loadFromSDMbrequest() {
+    Struct_MBRequest request = {0, 0, 0, 0, 0}; // Inicializamos a cero
+    
+    // Usamos "sssss" para leer strings y luego convertirlos
+    CSV_Parser cp("sssss", false, ';');
+
+    bool flag = _sd->withFile(MODBUS_REQ_FILE, [](Stream& file, void* arg) {
         CSV_Parser* parser = (CSV_Parser*)arg;
+        // Leemos hasta FIRST_BLOCK (que debe ser >= 8)
         for (int i = 0; i < FIRST_BLOCK; i++) {
             if (file.available()) {
                 String line = file.readStringUntil('\n');
+                line.trim();
                 if (line.length() > 0) {
                     line += "\n"; 
                     *parser << line.c_str();
                 }
+            } else {
+                break;
             }
         }
     }, &cp);
 
-    if(!flag){
-        Serial.println("algo paso"); 
-    }
-
-    // Verificamos que tenemos filas suficientes
     int rows = cp.getRowsCount();
-    if (rows < 3){
-        Serial.println("no filas suficientes");
-        return false; // No hay suficientes líneas para Device e IP
-    } 
-
-    // En CSV_Parser, el acceso cp[columna][fila] suele ser más estable
-    // Columna 0: Keys (Device Name, IP address)
-    // Columna 1: Values (EM 750, 192.168.0.202)
     
-    char **keys   = (char**)cp[0];
-    char **values = (char**)cp[1];
+    // La fila 8 del CSV es el índice 7 para el parser
+    if (flag && rows >= 8) {
+        // Obtenemos los punteros de cada columna
+        char **col0 = (char**)cp[0]; // Channel
+        char **col1 = (char**)cp[1]; // Start Address
+        char **col2 = (char**)cp[2]; // Length
+        char **col3 = (char**)cp[3]; // Function Code
+        char **col4 = (char**)cp[4]; // Interval
 
-    if (keys && values) {
-        // Buscamos en la fila 1 (Device Name)
-        if (rows > 1 && values[1]) {
-            strncpy(_device_name, values[1], MAX_TITLES_SIZE - 1);
-            _device_name[MAX_TITLES_SIZE - 1] = '\0';
+        // Verificamos que la fila 7 (Fila 8 del CSV) tenga datos
+        if (col0[7] && col1[7] && col2[7] && col3[7] && col4[7]) {
+            request.channel         = (uint16_t)atoi(col0[7]);
+            request.start_addres    = (uint16_t)atoi(col1[7]);
+            request.length          = (uint16_t)atoi(col2[7]);
+            request.func_code       = (uint16_t)atoi(col3[7]);
+            request.req_interval_ms = (uint16_t)atoi(col4[7]);
         }
-
-        // Buscamos en la fila 2 (IP address)
-        if (rows > 2 && values[2]) {
-            strncpy(_ip_address, values[2], MAX_TITLES_SIZE - 1);
-            _ip_address[MAX_TITLES_SIZE - 1] = '\0';
-        }
-        
-        return true;
     }
 
-    return false;
+    return request;
 }
-*/
-/*
-bool ModbusRequestCSV::loadFromSDParameters(){
- 
-    CSV_Parser cp("sssss", true, ';');
-
-    // Usamos withFile para obtener el stream de forma segura
-    _sd->withFile(MODBUS_REQ_FILE, [](Stream& file, void* arg) {
-        CSV_Parser* parser = (CSV_Parser*)arg;
-        
-        // Leemos solo hasta LINE_MAP_START (línea 4)
-        for (int i = 0; i < FIRST_BLOCK; i++) {
-            if (file.available()) {
-                String line = file.readStringUntil('\n');
-                if (line.length() > 0) {
-                    line += "\n";
-                    // Alimentamos el parser con las líneas de configuración
-                    *parser << line.c_str();
-                }
-            }
-        }
-    }, &cp);
-    
-    char **names  = (char**)cp[ (int)0 ]; 
-    char **values = (char**)cp[ (int)1 ]; 
-
-    if (values != nullptr && cp.getRowsCount() >= FIRST_BLOCK-1) {
-     
-        if (values[0]) {
-            strncpy(_device_name, values[0], MAX_TITLES_SIZE - 1);
-            _device_name[MAX_TITLES_SIZE - 1] = '\0';
-        }
-        
-        if (values[1]) {
-            strncpy(_ip_address, values[1], MAX_TITLES_SIZE - 1);
-            _ip_address[MAX_TITLES_SIZE - 1] = '\0';
-        }
-        
-       // if (values[2]) {
-        //    strncpy(_max_files, values[2], MAX_TITLES_SIZE - 1);
-       //     _max_files[MAX_TITLES_SIZE - 1] = '\0';
-       // }
-    }
-
-}
-*/

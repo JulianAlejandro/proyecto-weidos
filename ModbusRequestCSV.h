@@ -8,8 +8,16 @@
 #define MAX_TITLES_SIZE 32 // TODO cambiatar esto de nombre
 #define MODBUS_REQ_FILE "MBReq.csv"
 
-#define FIRST_BLOCK 3
+//#define FIRST_BLOCK 3
+#define FIRST_BLOCK 10
 
+struct Struct_MBRequest {
+    uint16_t channel; 
+    uint16_t start_addres; 
+    uint16_t length; 
+    uint16_t func_code;
+    uint16_t req_interval_ms; 
+};
 
 class ModbusRequestCSV { // TODO Esta clase tendra que cambiar de nombre a algo que gestione CSVs
 
@@ -27,6 +35,8 @@ public:
 
   char* getDeviceName(){return _device_name;}
   char* getIpAdress(){return _ip_address;} 
+
+  Struct_MBRequest loadFromSDMbrequest(); 
 
 };
 

@@ -78,6 +78,26 @@ void setup() {
 
   Serial.println(p.getDeviceName());
   Serial.println(p.getIpAdress()); 
+
+
+  Struct_MBRequest res = p.loadFromSDMbrequest(); 
+
+  Serial.print("channel: ");
+  Serial.println(res.channel); 
+
+  Serial.print("start_addres: ");
+  Serial.println(res.start_addres); 
+
+  Serial.print("length: ");
+  Serial.println(res.length); 
+
+  Serial.print("func_code: ");
+  Serial.println(res.func_code); 
+
+  Serial.print("req_interval_ms: ");
+  Serial.println(res.req_interval_ms); 
+
+
   //req = regInterpreter.startN;ewRequest(19000, 120);
   //regInterpreter.loadParametersMapRegister(); 
 
