@@ -1,3 +1,4 @@
+/*
 #include "SDManager.h"
 //#include <SD.h>
 
@@ -23,4 +24,4 @@ public:
     // Método para entregar la configuración a otros objetos
     DeviceConfig getDeviceConfig();
 };
-
+*/

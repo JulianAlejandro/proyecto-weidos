@@ -4,12 +4,232 @@
 #include <RTClib.h>
 
 //Librerias mias 
+#include "src/Datalogger.h"
+#include "src/EnergyMeter/EnergyMeter750.h"
+#include "src/SDManager.h"
+
+#include "src/EnergyMeter/EnergyMeterRegInterpreter.h"
+//#include "src/ConfigManager.h"
+#include "src/ModbusRequestCSV.h"
+
+// --- Configuración de Red ---
+
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
+IPAddress ip(192, 168, 0, 10);
+IPAddress server(192, 168, 0, 100); // update with the IP Address of your Modbus server
+
+EthernetClient ethClient;
+ModbusTCPClient modbusTCPClient(ethClient);
+
+RTC_DS3231 rtc;
+
+//---Objetos de Gestion 
+SDManager sd;  // gestion SD compartido
+Datalogger datalogger(&sd); // usa SD para hacer LOGs
+EnergyMeterRegInterpreter regInterpreter(&sd); // usa SD para interpretar mapa de memoria de EM
+//ConfigManager cfgManager(&sd); // usa SD para leer JSON con configuracion basica de medida de EM. 
+EnergyMeter750 energy_meter(1); //TODO usa EM para leer por modbus TCP o RTU Slave (de momento solo modbus)
+
+ModbusRequestCSV mb_csv(&sd);
+
+//----codigo a revisar 
+//#define SLAVE_ADDRESS 1 // A eliminar posiblemente MAL
+
+unsigned long anteriorMillisModbus = 0; // Almacena la última vez que leíste
+unsigned long anteriorMillisArchivo = 0;
+
+EM_request req;              // El contador que quieres incrementar
+
+void lectura_modbus();
+void crear_nueva_sesion_log();
+
+nameColValues misTitulos;
+//DeviceConfig json_cfg; 
+
+void setup() {
+  
+  Serial.begin(115200);
+
+  if (!sd.begin()) {
+    Serial.println(F("Error: No se pudo iniciar la SD"));
+    while(1); //bloqueamos el sistema ya que si no hay SD no se puede hacer nada. 
+  }
+
+  if(! datalogger.begin()){ // mira si esta creada el directorio de log si no esta creado , lo crea
+    Serial.println("Error en encendido de datalogger");
+    while(1);
+  }
+ 
+  if(! regInterpreter.begin()){
+    Serial.println("Fallo reg interpretert");
+    while(1);
+  }
+  
+  if (! rtc.begin()) { // todo while(1) bloquea al micro, cambiar
+     Serial.print("Fallo RTC");
+     while(1);
+  }
+
+
+//---------------este objeto es necesario inicializarlo y tomar la ip---------------
+  if(! mb_csv.begin()){
+    Serial.println("Fallo reg modbus request");
+    while(1);
+  }
+
+  if(!mb_csv.loadFromSDParameters()){
+    Serial.println("fallo load");    
+  }
+
+  Serial.println(mb_csv.getDeviceName());
+  Serial.println(mb_csv.getIpAdress());
+
+// en este punto es necesario configurar la ip y ya despues si inicializar el energy meter con el modbus
+
+  if(!energy_meter.begin(&modbusTCPClient)){ // se le pasa el tipo de conexion y acceso a funciones de la SD 
+    Serial.println("Error al iniciar el energy meter");
+    while(1);
+  }
+
+// una vez todo configurado necesitamos obtener la estructura del modbus request. 
+
+   Struct_MBRequest res = mb_csv.loadFromSDMbrequest(); 
+
+  Serial.print("channel: ");
+  Serial.println(res.channel); 
+
+  Serial.print("start_addres: ");
+  Serial.println(res.start_addres); 
+
+  Serial.print("length: ");
+  Serial.println(res.length); 
+
+  Serial.print("func_code: ");
+  Serial.println(res.func_code); 
+
+  Serial.print("req_interval_ms: ");
+  Serial.println(res.req_interval_ms); 
+
+// una vez se tienen esos valores pasarselos a la clase regInterpreter que es la que se va a encargar de todo ahora. 
+
+   req = regInterpreter.startNewRequest(res.start_addres, res.length);
+  
+        Serial.print("valores de req: ");
+        Serial.print(req.start_addr); 
+        Serial.print(" size: ");
+        Serial.println(req.size); 
+
+  misTitulos = regInterpreter.getLastNameValues();// titulos general para las medidas.......aqui hay un cambio de paradigma
+
+  Serial.println("Los titulos: ");
+  for(int i = 0; i < misTitulos.size; i++){
+    Serial.println(misTitulos.buffer[i]);
+  }
+  
+  Ethernet.init(ETHERNET_CS);
+  if (Ethernet.linkStatus() == LinkOFF){
+    Serial.println("Ethernet Cable is not connected");
+    while(1);
+  }
+  Ethernet.begin(mac, ip); 
+
+  delay(5000); // esperamos 5 segundos
+
+  Serial.println("Empieza el loop");
+}
+
+void loop() {
+
+  
+    unsigned long actualMillis = millis();
+
+    // --- Bucle de lectura Modbus ---
+    if (actualMillis - anteriorMillisModbus >= 10000) { // modificar 
+        anteriorMillisModbus = actualMillis;
+        lectura_modbus();       
+    }
+
+    // --- Bucle de nueva sesión de log ---
+    if (actualMillis - anteriorMillisArchivo >= (60 * 1000UL)) {
+        anteriorMillisArchivo = actualMillis;
+        crear_nueva_sesion_log();
+    }
+
+    
+}
+
+void lectura_modbus() {
+  if (!modbusTCPClient.connected()) {
+    Serial.println("Reconectando Modbus...");
+    modbusTCPClient.begin(server, 502);
+    delay(2000);
+  } else {
+         Serial.println("Escribiendo una linea de datos en LOG...");
+
+      // obtenemos datos modbus y los interpretamos
+      if (!energy_meter.executeRequest(req)) { 
+       Serial.println("error al ejecutar la solicitud de lectura de registros");
+      }
+
+      rawDataBuffer raw = energy_meter.readDataBuffer();// lectura de registros 
+      regInterpreter.getBufferDataRaw(raw.buffer, raw.size);
+      
+
+      netDataString res = regInterpreter.getBufNetDataString(); 
+
+      DateTime now = rtc.now();
+      char bufferTime[20];
+      sprintf(bufferTime, "%04d-%02d-%02d %02d:%02d:%02d", 
+            now.year(), now.month(), now.day(), 
+            now.hour(), now.minute(), now.second());
+
+      if(!datalogger.writeRow(bufferTime, res.buffer, res.size)){
+        Serial.println("Error escribiendo en SD"); 
+      } 
+
+      datalogger.printLogToSerial();
+      
+  }
+}
+
+void crear_nueva_sesion_log() {
+    
+    DateTime ahora = rtc.now();
+    char nombreFichero[25]; 
+
+   // sprintf(nombreFichero, "%02d%02d%02d%02d%02d%02d.txt", 
+    
+    sprintf(nombreFichero, "%02d%02d%02d.txt", 
+            //ahora.year() % 100, // Usamos % 100 para obtener solo "26" de "2026"
+            //ahora.month(), 
+            //ahora.day(), 
+            ahora.hour(), 
+            ahora.minute(), 
+            ahora.second());
+    
+    Serial.print("Cambiando a nueva sesion: ");
+    Serial.println(nombreFichero);
+       
+    if(!datalogger.newSesion(nombreFichero, misTitulos.buffer, misTitulos.size)){
+        Serial.println("Error al crear el archivo por timestamp");
+    }
+    
+}
+
+
+
+/*
+#include <Ethernet.h>
+#include <ArduinoModbus.h>
+#include <RTClib.h>
+
+//Librerias mias 
 //#include "src/Datalogger.h"
 //#include "src/EnergyMeter/EnergyMeter750.h"
 #include "src/SDManager.h"
 
 //#include "src/EnergyMeter/EnergyMeterRegInterpreter.h"
-#include "ModbusRequestCSV.h"
+#include "src/ModbusRequestCSV.h"
 
 //#include "src/ConfigManager.h"
 
@@ -244,7 +464,7 @@ void crear_nueva_sesion_log() {
 }
 
 
-
+*/
 
 /*
 #include <CSV_Parser.h>
@@ -352,186 +572,3 @@ void loop() {
 
 */
 
-/*
-#include <Ethernet.h>
-#include <ArduinoModbus.h>
-#include <RTClib.h>
-
-//Librerias mias 
-#include "src/Datalogger.h"
-#include "src/EnergyMeter/EnergyMeter750.h"
-#include "src/SDManager.h"
-
-#include "src/EnergyMeter/EnergyMeterRegInterpreter.h"
-//#include "src/ConfigManager.h"
-
-// --- Configuración de Red ---
-
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
-IPAddress ip(192, 168, 0, 10);
-IPAddress server(192, 168, 0, 100); // update with the IP Address of your Modbus server
-
-EthernetClient ethClient;
-ModbusTCPClient modbusTCPClient(ethClient);
-
-RTC_DS3231 rtc;
-
-//---Objetos de Gestion 
-SDManager sd;  // gestion SD compartido
-Datalogger datalogger(&sd); // usa SD para hacer LOGs
-EnergyMeterRegInterpreter regInterpreter(&sd); // usa SD para interpretar mapa de memoria de EM
-//ConfigManager cfgManager(&sd); // usa SD para leer JSON con configuracion basica de medida de EM. 
-EnergyMeter750 energy_meter(1); //TODO usa EM para leer por modbus TCP o RTU Slave (de momento solo modbus)
-
-//----codigo a revisar 
-//#define SLAVE_ADDRESS 1 // A eliminar posiblemente MAL
-
-unsigned long anteriorMillisModbus = 0; // Almacena la última vez que leíste
-unsigned long anteriorMillisArchivo = 0;
-
-EM_request req;              // El contador que quieres incrementar
-
-void lectura_modbus();
-void crear_nueva_sesion_log();
-
-titlesBuffer misTitulos;
-//DeviceConfig json_cfg; 
-
-void setup() {
-  
-  Serial.begin(115200);
-
-  if (!sd.begin()) {
-    Serial.println(F("Error: No se pudo iniciar la SD"));
-    while(1); //bloqueamos el sistema ya que si no hay SD no se puede hacer nada. 
-  }
-
-  if(! datalogger.begin()){ // mira si esta creada el directorio de log si no esta creado , lo crea
-    Serial.println("Error en encendido de datalogger");
-    while(1);
-  }
- 
-  if(! regInterpreter.begin()){
-    Serial.println("Fallo reg interpretert");
-    while(1);
-  }
-  
-  if (! rtc.begin()) { // todo while(1) bloquea al micro, cambiar
-     Serial.print("Fallo RTC");
-     while(1);
-  }
-
-  if(!energy_meter.begin(&modbusTCPClient)){ // se le pasa el tipo de conexion y acceso a funciones de la SD 
-    Serial.println("Error al iniciar el energy meter");
-    while(1);
-  }
-
-  // iniciamos el ethernet para modbus funcione
-
-  Ethernet.init(ETHERNET_CS);
-  if (Ethernet.linkStatus() == LinkOFF){
-    Serial.println("Ethernet Cable is not connected");
-    while(1);
-  }
-  Ethernet.begin(mac, ip); 
-
-  delay(5000); // esperamos 5 segundos
-
-  //json_cfg = cfgManager.getDeviceConfig(); // obtenemos estructura de configuracion JSON
-
-  //req = regInterpreter.startNewRequest(19000, 10);
-  
-  //Serial.print("val json_cfg start addr: "); 
-  //Serial.println(json_cfg.start_addr);
-  //Serial.print("val json_cfg start size: ");
-  //Serial.println(json_cfg.length);
-
-  req = regInterpreter.startNewRequest(19000, 10);
-
-  Serial.print("valores de req: ");
-  Serial.print(req.start_addr); 
-  Serial.print(" size: ");
-  Serial.println(req.size); 
-
-  misTitulos = regInterpreter.getTitles();
-
-  Serial.println("Los titulos: ");
-  for(int i = 0; i < misTitulos.size; i++){
-    Serial.println(misTitulos.buffer[i]);
-  }
-// esto es equivalente a crear un LOG nuevo y ponerle un header con misTitulo
-
-  Serial.println("Empieza el loop");
-}
-
-void loop() {
-    unsigned long actualMillis = millis();
-
-    // --- Bucle de lectura Modbus ---
-    if (actualMillis - anteriorMillisModbus >= 1000) {
-        anteriorMillisModbus = actualMillis;
-        lectura_modbus();       
-    }
-
-    // --- Bucle de nueva sesión de log ---
-    if (actualMillis - anteriorMillisArchivo >= (60 * 1000UL)) {
-        anteriorMillisArchivo = actualMillis;
-        crear_nueva_sesion_log();
-    }
-}
-
-
-void lectura_modbus() {
-  if (!modbusTCPClient.connected()) {
-    Serial.println("Reconectando Modbus...");
-    modbusTCPClient.begin(server, 502);
-    delay(2000);
-  } else {
-         Serial.println("Escribiendo una linea de datos en LOG...");
-
-      // obtenemos datos modbus y los interpretamos
-      if (!energy_meter.executeRequest(req)) { 
-       Serial.println("error al ejecutar la solicitud de lectura de registros"); 
-      }
-
-      rawDataBuffer raw = energy_meter.readDataBuffer();// lectura de registros 
-      regInterpreter.getDataProcess(raw.buffer, raw.size);
-      stringDataEM res = regInterpreter.getStringData(); 
-
-      DateTime now = rtc.now();
-      char bufferTime[20];
-      sprintf(bufferTime, "%04d-%02d-%02d %02d:%02d:%02d", 
-            now.year(), now.month(), now.day(), 
-            now.hour(), now.minute(), now.second());
-
-      if(!datalogger.writeRow(bufferTime, res.buffer, res.size)){
-        Serial.println("Error escribiendo en SD"); 
-      } 
-
-      datalogger.printLogToSerial();
-  }
-}
-
-void crear_nueva_sesion_log() {
-    
-    DateTime ahora = rtc.now();
-    char nombreFichero[25]; 
-
-   // sprintf(nombreFichero, "%02d%02d%02d%02d%02d%02d.txt", 
-    
-    sprintf(nombreFichero, "%02d%02d%02d.txt", 
-            //ahora.year() % 100, // Usamos % 100 para obtener solo "26" de "2026"
-            //ahora.month(), 
-            //ahora.day(), 
-            ahora.hour(), 
-            ahora.minute(), 
-            ahora.second());
-    
-    Serial.print("Cambiando a nueva sesion: ");
-    Serial.println(nombreFichero);
-       
-    if(!datalogger.newSesion(nombreFichero, misTitulos.buffer, misTitulos.size)){
-        Serial.println("Error al crear el archivo por timestamp");
-    }
-}
-*/

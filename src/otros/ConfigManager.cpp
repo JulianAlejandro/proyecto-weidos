@@ -1,3 +1,4 @@
+/*
 #include "ConfigManager.h"
 #include <ArduinoJson.h>
 
@@ -51,35 +52,35 @@ DeviceConfig ConfigManager::getDeviceConfig() {
     _config.log_interval_s = (doc["log_interval"] | 60); // Guardamos en segundos
     _config.meas_interval_ms = doc["measure_interval"] | 1000;
 
-/*
-      start_addr       = doc["start_addr"]       | 0;
-  length           = doc["length"]           | 1;
-  log_interval     = doc["log_interval"]     | 300;
-  measure_interval = doc["measure_interval"] | 1000;
-*/
+
+  //    start_addr       = doc["start_addr"]       | 0;
+  //length           = doc["length"]           | 1;
+  //log_interval     = doc["log_interval"]     | 300;
+  //measure_interval = doc["measure_interval"] | 1000;
+
     return _config;
 }
-/*
- DeviceConfig ConfigManager::getDeviceConfig(){
 
-  if (!_sd || !_sd->isReady()) {
-        Serial.println(F("Error: SD no lista en ConfigManager"));
-        return _config; 
-    }
+ //DeviceConfig ConfigManager::getDeviceConfig(){
 
-    JsonDocument doc;
-    //DeserializationError error = deserializeJson(doc, file);
-    _sd->withFile(_filename, staticCallback, &doc);
+  //if (!_sd || !_sd->isReady()) {
+   //     Serial.println(F("Error: SD no lista en ConfigManager"));
+     //   return _config; 
+    //}
+
+    //JsonDocument doc;
+                //DeserializationError error = deserializeJson(doc, file);
+    //_sd->withFile(_filename, staticCallback, &doc);
 
    //if (error) return false;
 
         // Mapeo de JSON a la estructura C++
 
-  _config.start_addr = doc["start_addr"] | 1;
-  _config.length = doc["length"] | 1;
-  _config.log_interval_s = (doc["log_interval_sec"] | 60) * 1000UL;
-  _config.meas_interval_ms = doc["measure_interval_ms"] | 1000;
+  //_config.start_addr = doc["start_addr"] | 1;
+  //_config.length = doc["length"] | 1;
+  //_config.log_interval_s = (doc["log_interval_sec"] | 60) * 1000UL;
+  //_config.meas_interval_ms = doc["measure_interval_ms"] | 1000;
 
-    return _config; 
- }
+    //return _config; 
+ //}
  */

@@ -1,4 +1,3 @@
-
 #ifndef ENERGY_METER_750_H
 #define ENERGY_METER_750_H
 
@@ -19,7 +18,7 @@ class EnergyMeter750 {
     uint8_t _slaveAddress;
     ModbusTCPClient* _modbus; // Usamos puntero para flexibilidad
 
-    uint16_t _internalBuffer[MAX_MODBUS_REGS];
+    uint16_t _internalBuffer[MAX_MODBUS_REGS_REQUEST];
     uint16_t _lastReadSize; 
 
     int getFormatSize(coded_format f);

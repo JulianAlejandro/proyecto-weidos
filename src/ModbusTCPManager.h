@@ -13,17 +13,7 @@ class ModbusTCPManager {
     ModbusTCPClient _modbusClient;
 
     // Método privado para asegurar que estamos conectados antes de operar
-    bool ensureConnection() {
-      if (!_modbusClient.connected()) {
-        Serial.println("Modbus: Intentando conectar al servidor...");
-        if (!_modbusClient.begin(_serverIP, _port)) {
-          Serial.println("Modbus: Fallo en la conexión.");
-          return false;
-        }
-        Serial.println("Modbus: Conectado exitosamente.");
-      }
-      return true;
-    }
+    bool ensureConnection();
 
   public:
     // Constructor
@@ -35,45 +25,25 @@ class ModbusTCPManager {
     }
 
     // Inicialización (se llama en el setup)
-    void begin(byte mac[], IPAddress localIP) {
-      Ethernet.init(ETHERNET_CS); 
-      Ethernet.begin(mac, localIP);
-      delay(1000); // Dar tiempo al chip Ethernet
-    }
+    void begin(byte mac[], IPAddress localIP);
 
     // --- MÉTODOS DE LECTURA ---
 
-    bool readCoils(int address, int quantity) {
-      if (!ensureConnection()) return false;
-      return _modbusClient.requestFrom(_slaveID, COILS, address, quantity);
-    }
+    bool readCoils(int address, int quantity);
 
-    bool readHoldingRegisters(int address, int quantity) {
-      if (!ensureConnection()) return false;
-      return _modbusClient.requestFrom(_slaveID, HOLDING_REGISTERS, address, quantity);
-    }
+    bool readHoldingRegisters(int address, int quantity);
 
     // Recupera el dato después de un request exitoso
-    long getAvailableData() {
-      return _modbusClient.read();
-    }
+    long getAvailableData();
 
     // --- MÉTODOS DE ESCRITURA ---
 
-    bool writeHoldingRegister(int address, uint16_t value) {
-      if (!ensureConnection()) return false;
-      return _modbusClient.holdingRegisterWrite(_slaveID, address, value);
-    }
+    bool writeHoldingRegister(int address, uint16_t value);
 
-    bool writeCoil(int address, bool value) {
-      if (!ensureConnection()) return false;
-      return _modbusClient.coilWrite(_slaveID, address, value);
-    }
+    bool writeCoil(int address, bool value);
 
     // Check de estado
-    bool isConnected() {
-      return _modbusClient.connected();
-    }
+    bool isConnected();
 };
 
 #endif

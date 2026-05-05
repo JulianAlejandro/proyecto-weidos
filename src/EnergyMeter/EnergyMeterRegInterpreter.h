@@ -5,10 +5,12 @@
 #include "../SDManager.h"
 #include <CSV_Parser.h>
 //#include <vector>
+//#include "EnergyMeter750.h"
 
 #define NUM_COL_REG_EM750 5
 #define MAX_MODBUS_REGS 125 // TODO DE MOMENTO ESTE INTERPRETADOR DE REGISTROS FUNCIONA SOLO PARA MODBUS 
 #define MAX_TITLES_SIZE 32 // TODO cambiatar esto de nombre
+#define MAX_TEXT_SIZE 32
 
 #define MAX_DATA_SIZE 4 // numero maximo de tamaño que puede tener un dato en el mapa de registros 
 #define LINE_MAP_START 4
@@ -25,8 +27,10 @@
 #define SIZE_BYTE    1
 #define SIZE_DFLOAT  1
 
-enum coded_format { FORMAT_UNKNOWN, FLOAT, SHORT, INT, STRING, USHORT, UINT, BYTE, LONG64, DFLOAT };
+// todo añadir algunos defines para que las columnas no se busquen hardcoded
+//#define ADDRESS 
 
+enum coded_format { FORMAT_UNKNOWN, FLOAT, SHORT, INT, STRING, USHORT, UINT, BYTE, LONG64, DFLOAT };
 
 //Estructura para realziar una solicitud de valores de registros. 
 struct EM_request {
@@ -34,32 +38,31 @@ struct EM_request {
     uint16_t size; 
 };
 
-//Estructura de registro 
-struct completeDataReg {
+//regustro que almacena los registros que forman un dato e informacion importante como el formato, log etc 
+// TODO esto hay qye cambiarlo 
+struct rawDataReg {
     uint16_t data[MAX_DATA_SIZE];
     coded_format format; 
+
 };
 
-struct CompleteDataRegBuffer{
-    completeDataReg* buffer;
+// buffer de datos , estructura usada para recuperar datos procesados 
+struct bufRawDataReg{
+    rawDataReg* buffer;
     uint16_t size; 
 };
 
 // TODO pensar en si es aconsejable esto
-enum index_reg_EM750 { ADDR, FORMAT, RD_WR, UNIT, NOTE };
+//enum index_col_regs {ADDRESS, FORMAT, UNIT, NAME, LOG};
 //enum index_parameters { NAME, VALUE };
 
-//todo ya
-struct reg_EM_750 { 
-    const char* data[NUM_COL_REG_EM750];
-};
-
-struct titlesBuffer {
+//estructura que apunta a los ultimos valores de la columna nombres 
+struct nameColValues {
     const char* buffer[MAX_MODBUS_REGS]; // Array de punteros a las cadenas
     uint16_t size;
 };
 
-struct stringDataEM{
+struct netDataString{
     const char* buffer[MAX_MODBUS_REGS];
     uint16_t size; 
 };
@@ -72,6 +75,11 @@ struct Parameters{
 
 typedef void (*TitleHandler)(const char* title, void* arg);
 
+/*
+class EnergyMeter750;
+class Datalogger; 
+class RTC_DS3231; 
+*/
 //TODO String _setup cambiar
 class EnergyMeterRegInterpreter { // TODO Esta clase tendra que cambiar de nombre a algo que gestione CSVs
 
@@ -80,26 +88,25 @@ private:
     EM_request _current_request; // TODO podemos pasarlo por copia y no por referencial....
     String _setupFile;
 
-//variables de apoyo a la lectura de la SD
-    uint16_t _SDaddrsBuffer[MAX_MODBUS_REGS]; // almacena los Addr que se quieren leer en una request. 250 bytes reservados stack
-    coded_format _SDformatBuffer[MAX_MODBUS_REGS]; // almacena los formatos que hay en una request
+//TODO aqui podemos hacer un destrozo
+    uint16_t _bufAddrsValues[MAX_MODBUS_REGS]; // almacena los Addr que se quieren leer en una request. 250 bytes reservados stack
+    coded_format _bufFormatValues[MAX_MODBUS_REGS]; // almacena los formatos que hay en una request
+    char _bufNamesValues[MAX_MODBUS_REGS][MAX_TITLES_SIZE]; 
+    bool _bufLogValues[MAX_MODBUS_REGS];
+    //char _bufUnitValues[MAX_MODBUS_REGS][MAX_TITLES_SIZE];
+    
+    // Este buffer solo se actualiza tras recuperar los datos de EM
+    rawDataReg _bufRawData[MAX_MODBUS_REGS]; // 125 x (4x2 + 4) = 1500 bytes aprox
 
-    // TODO, peligrosos titulos muy grandes pueden dar problemas
-    // Modificar estos titulos persistentes 
-     char _titulos[MAX_MODBUS_REGS][MAX_TITLES_SIZE]; 
-    //const char* _titulosBuffer[MAX_MODBUS_REGS]; // buffer con los titulos de los registros que hay en la request
+    char _bufNetDataString[MAX_MODBUS_REGS][MAX_TEXT_SIZE];
 
-    //completeDataReg data_readed[MAX_MODBUS_REG]; 
-    completeDataReg _completeDataR[MAX_MODBUS_REGS]; // 125 x (4x2 + 4) = 1500 bytes aprox
-    char _netaData[MAX_MODBUS_REGS][MAX_TITLES_SIZE];
-
-    uint16_t _SDlastRowReadSize; // size del numero de registros que se quieren leer en una request. 
+    uint16_t _lastRowReadSize; // size del numero de registros que se quieren leer en una request. 
 
     //TODO valorar donde poner esto
     // estos son almacenes para mantener la persistencia de datos obtenidos en startNewRequest para estos parametros 
-    char _log_interval[MAX_TITLES_SIZE]; 
-    char _new_file[MAX_TITLES_SIZE]; 
-    char _max_files[MAX_TITLES_SIZE];
+    char _log_interval[MAX_TEXT_SIZE]; 
+    char _new_file[MAX_TEXT_SIZE]; 
+    char _max_files[MAX_TEXT_SIZE];
    
     //bool splitString(char* linea, char div_char, reg_EM_750 &resultado); // funcion de apoyo para obtener valores de registro en Strings
     int getFormatSize(coded_format f); // Convierte un enum en valores de int para obtener el tamaño de cada registro
@@ -117,11 +124,11 @@ public:
 
     EM_request startNewRequest (const uint16_t start_addr, const uint16_t size);
 
-    CompleteDataRegBuffer getDataProcess(const uint16_t* datos, const uint16_t size);
+    bufRawDataReg getBufferDataRaw(const uint16_t* datos, const uint16_t size);
 
-    titlesBuffer getTitles();
+    nameColValues getLastNameValues();
 
-    stringDataEM getStringData();
+    netDataString getBufNetDataString();
     //void getTitles(const uint16_t start_addr, const uint16_t size, TitleHandler handler, void* arg);
 
     // Función auxiliar para convertir String a Enum
@@ -143,6 +150,8 @@ public:
 
     //TODO funciones relacionadas con la MODBUS REQUEST, EN UN FUTURO REFACTORIZAR 
     //bool modbusRequestByFile(char* filename);
+
+    //void functionDatalogger(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
 
 };
 
