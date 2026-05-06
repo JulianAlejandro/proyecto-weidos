@@ -1,4 +1,3 @@
-
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
 #include <RTClib.h>
@@ -16,7 +15,8 @@
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
 IPAddress ip(192, 168, 0, 10);
-IPAddress server(192, 168, 0, 100); // update with the IP Address of your Modbus server
+IPAddress server(192, 168, 0, 200); // update with the IP Address of your Modbus server
+//IPAddress server();
 
 EthernetClient ethClient;
 ModbusTCPClient modbusTCPClient(ethClient);
@@ -46,6 +46,8 @@ void crear_nueva_sesion_log();
 nameColValues misTitulos;
 //DeviceConfig json_cfg; 
 
+uint16_t log_interval = 5000; 
+
 void setup() {
   
   Serial.begin(115200);
@@ -70,7 +72,6 @@ void setup() {
      while(1);
   }
 
-
 //---------------este objeto es necesario inicializarlo y tomar la ip---------------
   if(! mb_csv.begin()){
     Serial.println("Fallo reg modbus request");
@@ -85,6 +86,7 @@ void setup() {
   Serial.println(mb_csv.getIpAdress());
 
 // en este punto es necesario configurar la ip y ya despues si inicializar el energy meter con el modbus
+  server.fromString(mb_csv.getIpAdress()); 
 
   if(!energy_meter.begin(&modbusTCPClient)){ // se le pasa el tipo de conexion y acceso a funciones de la SD 
     Serial.println("Error al iniciar el energy meter");
@@ -93,7 +95,7 @@ void setup() {
 
 // una vez todo configurado necesitamos obtener la estructura del modbus request. 
 
-   Struct_MBRequest res = mb_csv.loadFromSDMbrequest(); 
+  Struct_MBRequest res = mb_csv.loadFromSDMbrequest(); 
 
   Serial.print("channel: ");
   Serial.println(res.channel); 
@@ -125,6 +127,14 @@ void setup() {
   for(int i = 0; i < misTitulos.size; i++){
     Serial.println(misTitulos.buffer[i]);
   }
+
+  //------------obtener los otros parametros------------
+  regInterpreter.loadParametersMapRegister(); 
+  Parameters param = regInterpreter.getParameters(); 
+  log_interval = atoi(param.log_interval);
+
+  Serial.print("el tiempo de log: "); 
+  Serial.println(log_interval);
   
   Ethernet.init(ETHERNET_CS);
   if (Ethernet.linkStatus() == LinkOFF){
@@ -143,14 +153,14 @@ void loop() {
   
     unsigned long actualMillis = millis();
 
-    // --- Bucle de lectura Modbus ---
-    if (actualMillis - anteriorMillisModbus >= 10000) { // modificar 
+    // ---  ---
+    if (actualMillis - anteriorMillisModbus >= log_interval) { // modificar 
         anteriorMillisModbus = actualMillis;
         lectura_modbus();       
     }
 
     // --- Bucle de nueva sesión de log ---
-    if (actualMillis - anteriorMillisArchivo >= (60 * 1000UL)) {
+    if (actualMillis - anteriorMillisArchivo >= (60 * 1000UL)) { // preguntar a xavi como va 
         anteriorMillisArchivo = actualMillis;
         crear_nueva_sesion_log();
     }

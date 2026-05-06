@@ -32,6 +32,14 @@
 
 enum coded_format { FORMAT_UNKNOWN, FLOAT, SHORT, INT, STRING, USHORT, UINT, BYTE, LONG64, DFLOAT };
 
+struct RegisterEntry {
+    uint16_t address;
+    coded_format format;
+    char name[MAX_TITLES_SIZE];
+    bool logEnabled;
+    // Optional: uint16_t modbusSize; // Pre-calculated size
+};
+
 //Estructura para realziar una solicitud de valores de registros. 
 struct EM_request {
     uint16_t start_addr; 
@@ -73,6 +81,7 @@ struct Parameters{
     const char* max_files; 
 };
 
+
 typedef void (*TitleHandler)(const char* title, void* arg);
 
 /*
@@ -86,22 +95,18 @@ class EnergyMeterRegInterpreter { // TODO Esta clase tendra que cambiar de nombr
 private:
     SDManager* _sd = nullptr; 
     EM_request _current_request; // TODO podemos pasarlo por copia y no por referencial....
-    String _setupFile;
 
 //TODO aqui podemos hacer un destrozo
-    uint16_t _bufAddrsValues[MAX_MODBUS_REGS]; // almacena los Addr que se quieren leer en una request. 250 bytes reservados stack
-    coded_format _bufFormatValues[MAX_MODBUS_REGS]; // almacena los formatos que hay en una request
-    char _bufNamesValues[MAX_MODBUS_REGS][MAX_TITLES_SIZE]; 
-    bool _bufLogValues[MAX_MODBUS_REGS];
-    //char _bufUnitValues[MAX_MODBUS_REGS][MAX_TITLES_SIZE];
-    
+    RegisterEntry _registryBuffer[MAX_MODBUS_REGS];
+
+    uint16_t _registrySize; // size del numero de registros almacenados en la estructura (Maximo MAX_MODBUS_REGS). 
+
     // Este buffer solo se actualiza tras recuperar los datos de EM
-    rawDataReg _bufRawData[MAX_MODBUS_REGS]; // 125 x (4x2 + 4) = 1500 bytes aprox
+    rawDataReg _RawDataBuffer[MAX_MODBUS_REGS]; // 125 x (4x2 + 4) = 1500 bytes aprox
 
-    char _bufNetDataString[MAX_MODBUS_REGS][MAX_TEXT_SIZE];
-
-    uint16_t _lastRowReadSize; // size del numero de registros que se quieren leer en una request. 
-
+    // Este buffer se actualiza cuando se quuiere acceder a los datos en formato string
+    char _netDataStringBuffer[MAX_MODBUS_REGS][MAX_TEXT_SIZE];
+  
     //TODO valorar donde poner esto
     // estos son almacenes para mantener la persistencia de datos obtenidos en startNewRequest para estos parametros 
     char _log_interval[MAX_TEXT_SIZE]; 
@@ -124,7 +129,7 @@ public:
 
     EM_request startNewRequest (const uint16_t start_addr, const uint16_t size);
 
-    bufRawDataReg getBufferDataRaw(const uint16_t* datos, const uint16_t size);
+    bufRawDataReg getBufferDataRaw(const uint16_t* data_readed, const uint16_t size);
 
     nameColValues getLastNameValues();
 
