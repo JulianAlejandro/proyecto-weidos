@@ -16,7 +16,6 @@ struct rawDataBuffer {
 
 class EnergyMeter750 {
   private:
-    //uint8_t _slaveAddress;
     ModbusTCPManager* _modbus; // Usamos puntero para flexibilidad
 
     uint16_t _internalBuffer[MAX_MODBUS_REGS_REQUEST];
@@ -26,12 +25,8 @@ class EnergyMeter750 {
    
   public:
 
-    // Constructor: le pasamos la dirección del esclavo
     EnergyMeter750();
-    //EnergyMeter750(uint8_t slaveAddress);
-    
-    // Configura el cliente Modbus que usará
-    //int begin(ModbusTCPClient* modbusClient);
+
     int begin(ModbusTCPManager* modbusTCP);
 
     uint16_t readData(uint16_t addr); 

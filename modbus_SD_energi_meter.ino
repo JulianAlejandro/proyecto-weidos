@@ -133,6 +133,10 @@ void setup() {
   
   delay(5000); // esperamos 5 segundos
   Serial.println("Empieza el loop");
+  
+  //creamos la primera sesion de log 
+  crear_nueva_sesion_log();
+
 }
 
 void loop() {
@@ -148,35 +152,38 @@ void loop() {
   // --- Bucle de nueva sesión de log ---
   if (actualMillis - anteriorMillisArchivo >= (60 * 1000UL)) { // preguntar a xavi como va 
     anteriorMillisArchivo = actualMillis;
+
+    datalogger.clearAllLogs();
     crear_nueva_sesion_log();
   }    
 }
 
 void lectura_modbus() {
-Serial.println("Escribiendo una linea de datos en LOG...");
+  Serial.println("Escribiendo una linea de datos en LOG...");
 
   // obtenemos datos modbus y los interpretamos
   if (!energy_meter.executeRequest(req)) { 
       Serial.println("error al ejecutar la solicitud de lectura de registros");
-  }
+  }else{
 
-  rawDataBuffer raw = energy_meter.readDataBuffer();// lectura de registros 
-  regInterpreter.getBufferDataRaw(raw.buffer, raw.size);
+    rawDataBuffer raw = energy_meter.readDataBuffer();// lectura de registros 
+    regInterpreter.getBufferDataRaw(raw.buffer, raw.size);
       
 
-  netDataString res = regInterpreter.getBufNetDataString(); 
+    netDataString res = regInterpreter.getBufNetDataString(); 
 
-  DateTime now = rtc.now();
-  char bufferTime[20];
-  sprintf(bufferTime, "%04d-%02d-%02d %02d:%02d:%02d", 
+    DateTime now = rtc.now();
+    char bufferTime[20];
+    sprintf(bufferTime, "%04d-%02d-%02d %02d:%02d:%02d", 
     now.year(), now.month(), now.day(), 
     now.hour(), now.minute(), now.second());
 
-  if(!datalogger.writeRow(bufferTime, res.buffer, res.size)){
-      Serial.println("Error escribiendo en SD"); 
-  } 
+    if(!datalogger.writeRow(bufferTime, res.buffer, res.size)){
+        Serial.println("Error escribiendo en SD"); 
+    } 
 
-  datalogger.printLogToSerial();
+    datalogger.printLogToSerial();
+  }
 }
 
 void crear_nueva_sesion_log() {

@@ -41,7 +41,8 @@ public:
     void clearLogFile();
     void printLogToSerial();
 
-    
+    void clearAllLogs();
+
 };
 
 #endif

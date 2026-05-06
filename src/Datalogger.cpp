@@ -2,24 +2,26 @@
 
 Datalogger::Datalogger(SDManager* sdManager) : _sd(sdManager), _fileCount(0) {
     memset(_filenames, 0, sizeof(_filenames));
-    memset(_currentLogFile, 0, sizeof(_currentLogFile));
+    _currentLogFile[0] = '\0';
+    //memset(_currentLogFile, 0, sizeof(_currentLogFile));
 }
 
 bool Datalogger::begin() {
     if (!_sd->isReady()) {
-        Serial.println(F("Datalogger: SDManager no detectado."));
+        //Serial.println(F("Datalogger: SDManager no detectado."));
         return false;
     }
 
     // 1. Usar el define para crear el directorio
     if (!_sd->createDirectory(DIR_LOG_NAME)) {
-        Serial.print(F("Datalogger: Error al crear "));
-        Serial.println(F(DIR_LOG_NAME));
+        //Serial.print(F("Datalogger: Error al crear "));
+        //Serial.println(F(DIR_LOG_NAME));
         return false;
     }
 
     scanExistingLogs();
 
+/*
     if (_fileCount == 0) {
         // 2. Usar la nueva función para el log por defecto
         if (!newLog("log.txt")) {
@@ -28,6 +30,9 @@ bool Datalogger::begin() {
     } else {
         selectLogByIndex(_fileCount - 1);
     }
+*/
+    //archivo actual esta vacio. 
+    memset(_currentLogFile, 0, sizeof(_currentLogFile));
 
     return true;
 }
@@ -233,4 +238,36 @@ bool Datalogger::newSesion(const char * name, const char** titles, uint16_t numT
         return false; 
     }
     return true; 
+}
+
+void Datalogger::clearAllLogs() {
+    // 1. Abrir el directorio de logs
+    File root = SD.open(DIR_LOG_NAME);
+    if (!root || !root.isDirectory()) return;
+
+    // 2. Recorrer todos los archivos y borrarlos
+    while (true) {
+        File entry = root.openNextFile();
+        if (!entry) break; // No hay más archivos
+
+        if (!entry.isDirectory()) {
+            const char* name = entry.name();
+            char fullPath[FILE_NAME_SIZE + 16]; // Buffer para la ruta completa
+            
+            snprintf(fullPath, sizeof(fullPath), "%s/%s", DIR_LOG_NAME, name);
+            
+            entry.close(); // Cerramos el archivo antes de borrarlo
+            SD.remove(fullPath); 
+        } else {
+            entry.close();
+        }
+    }
+    root.close();
+
+    // 3. Resetear el estado interno de la clase
+    _fileCount = 0;
+    memset(_filenames, 0, sizeof(_filenames));
+    memset(_currentLogFile, 0, sizeof(_currentLogFile));
+    
+    // Serial.println(F("Datalogger: Todos los logs han sido eliminados."));
 }
