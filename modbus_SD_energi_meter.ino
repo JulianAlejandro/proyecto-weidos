@@ -1,3 +1,96 @@
+
+
+#include <RTClib.h>
+
+//Librerias mias 
+#include "src/transport/ModbusTCPManager.h" // bajo pruebas
+
+#include "src/Datalogger.h"
+#include "src/devices/EnergyMeter750.h"
+#include "src/SDManager.h"
+
+#include "src/EnergyMeterRegInterpreter.h"
+//#include "src/ConfigManager.h"
+//#include "src/ModbusRequestCSV.h"
+
+#define SLAVE_ADDRESS 1 // A eliminar posiblemente MAL
+#define MODBUS_PORT 502
+
+// Configuración de red
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
+IPAddress ip(192, 168, 0, 10);
+IPAddress server(192, 168, 0, 200);
+
+RTC_DS3231 rtc;
+
+//---Objetos de Gestion 
+SDManager sd;  // gestion SD compartido
+Datalogger datalogger(&sd); // usa SD para hacer LOGs
+EnergyMeterRegInterpreter regInterpreter(&sd); // usa SD para interpretar mapa de memoria de EM
+EnergyMeter750 energy_meter; //TODO usa EM para leer por modbus TCP o RTU Slave (de momento solo modbus)
+
+ModbusRequestCSV mb_csv(&sd);
+ModbusTCPManager modbus(server, SLAVE_ADDRESS, MODBUS_PORT); // IP del servidor y Slave ID 1
+
+unsigned long anteriorMillisModbus = 0; // Almacena la última vez que leíste
+unsigned long anteriorMillisArchivo = 0;
+
+EM_request req;              // El contador que quieres incrementar
+
+void lectura_modbus();
+void crear_nueva_sesion_log();
+
+nameColValues misTitulos;
+
+uint16_t log_interval = 5000; 
+
+void setup() {
+  
+  Serial.begin(115200);
+
+  if (!sd.begin()) {
+    Serial.println(F("Error: No se pudo iniciar la SD"));
+    while(1); //bloqueamos el sistema ya que si no hay SD no se puede hacer nada. 
+  }
+
+  if(! datalogger.begin()){ // mira si esta creada el directorio de log si no esta creado , lo crea
+    Serial.println("Error en encendido de datalogger");
+    while(1);
+  }
+ 
+  if(! regInterpreter.begin()){
+    Serial.println("Fallo reg interpretert");
+    while(1);
+  }
+  
+  if (! rtc.begin()) { // todo while(1) bloquea al micro, cambiar
+     Serial.print("Fallo RTC");
+     while(1);
+  }
+
+// para iniciar el modbus del energymeter necesitamos algunos datos-> los recuperamos por parte de EnergyMeterRegInterpreter
+  IPAddress otra_ip_server(192, 168, 0, 100);
+
+  modbus.setIpServer(otra_ip_server);
+  modbus.begin(mac, ip); // esto va a aqui de momento
+
+  if(!energy_meter.begin(&modbus)){ // se le pasa el tipo de conexion y acceso a funciones de la SD 
+    Serial.println("Error al iniciar el energy meter");
+    while(1);
+  }
+
+// quiza no es mala idea esto... y dependiendo del tipo de puntero que reciba hacer una cosa u otra...
+  regInterpreter.advancedDatalogger(&datalogger, &energy_meter,  &rtc); // funcion bloqueante
+
+}
+
+void loop() {
+ 
+}
+
+
+
+/*
 #include <RTClib.h>
 
 //Librerias mias 
@@ -69,6 +162,7 @@ void setup() {
   modbus.begin(mac, ip); // esto va a aqui de momento
 
 //---------------este objeto es necesario inicializarlo y tomar la ip---------------
+  
   if(! mb_csv.begin()){
     Serial.println("Fallo reg modbus request");
     while(1);
@@ -156,6 +250,7 @@ void loop() {
     datalogger.clearAllLogs();
     crear_nueva_sesion_log();
   }    
+  
 }
 
 void lectura_modbus() {
@@ -209,3 +304,4 @@ void crear_nueva_sesion_log() {
     }
     
 }
+*/

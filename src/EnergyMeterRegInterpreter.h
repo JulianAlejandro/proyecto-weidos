@@ -2,10 +2,11 @@
 #ifndef ENERGY_METER_INTERPRETER_H
 #define ENERGY_METER_INTERPRETER_H
 
-#include "../SDManager.h"
+#include "SDManager.h"
 #include <CSV_Parser.h>
 //#include <vector>
 //#include "EnergyMeter750.h"
+#include "ModbusRequestCSV.h"
 
 #define NUM_COL_REG_EM750 5
 #define MAX_MODBUS_REGS 125 // TODO DE MOMENTO ESTE INTERPRETADOR DE REGISTROS FUNCIONA SOLO PARA MODBUS 
@@ -84,17 +85,20 @@ struct Parameters{
 
 typedef void (*TitleHandler)(const char* title, void* arg);
 
-/*
+
 class EnergyMeter750;
 class Datalogger; 
 class RTC_DS3231; 
-*/
-//TODO String _setup cambiar
+
 class EnergyMeterRegInterpreter { // TODO Esta clase tendra que cambiar de nombre a algo que gestione CSVs
 
 private:
     SDManager* _sd = nullptr; 
     EM_request _current_request; // TODO podemos pasarlo por copia y no por referencial....
+    ModbusRequestCSV mb_csv;  // objeto que lee solamente el request
+
+    void crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos);
+    void lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
 
 //TODO aqui podemos hacer un destrozo
     RegisterEntry _registryBuffer[MAX_MODBUS_REGS];
@@ -156,7 +160,7 @@ public:
     //TODO funciones relacionadas con la MODBUS REQUEST, EN UN FUTURO REFACTORIZAR 
     //bool modbusRequestByFile(char* filename);
 
-    //void functionDatalogger(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
+    void advancedDatalogger(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
 
 };
 

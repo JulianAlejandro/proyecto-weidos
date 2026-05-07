@@ -2,8 +2,8 @@
 #define ENERGY_METER_750_H
 
 #include <ArduinoModbus.h>
-#include "EnergyMeterRegInterpreter.h"
-#include "../ModbusTCPManager.h" 
+#include "../EnergyMeterRegInterpreter.h"
+#include "../transport/ModbusTCPManager.h" 
 
 #define NUM_COL_REG_EM750 5
 #define MAX_MODBUS_REGS_REQUEST 125
