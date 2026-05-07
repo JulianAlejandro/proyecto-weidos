@@ -29,19 +29,16 @@ class ModbusTCPManager : public ModbusTransport {
     // Sobrecarga para mantener tu lógica de inicialización de red
     void begin(byte mac[], IPAddress localIP);
 
-    bool isConnected() override; 
+    bool connected() override; 
     //bool connected() override { return isConnected(); }
 
     // Implementación del request genérico
-    /*bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) override {
-        if (!ensureConnection()) return false;
-        return _modbusClient.requestFrom(slaveAddress, type, address, nb);
-    }*/
+    bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) override;
 
     // Implementación de lectura
     //long read() override { return _modbusClient.read(); }
     
-    uint16_t getAvailableData() override;
+    uint16_t read() override;
 
     // Métodos de escritura (ajustados los nombres a la interfaz)
     bool writeHoldingRegister(uint16_t address, uint16_t value) override;

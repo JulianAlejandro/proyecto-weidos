@@ -36,8 +36,8 @@ public:
     /**
      * @brief Verifica si el cliente está conectado o el bus está listo.
      */
-    virtual bool isConnected() = 0;
-    //virtual bool connected() = 0;
+    
+    virtual bool connected() = 0;
 
     // --- Métodos de Lectura ---
 
@@ -49,13 +49,13 @@ public:
      * @param nb Cantidad de registros/puntos.
      * @return true si la petición fue aceptada/enviada con éxito.
      */
-    //virtual bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) = 0;
+    virtual bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) = 0;
 
     /**
      * @brief Lee el siguiente valor del buffer de la última petición requestFrom.
      * @return El valor leído (convertido a long para soportar diferentes tipos).
      */
-    //virtual long read() = 0;
+    virtual uint16_t read() = 0;
 
     /**
      * @brief Método de conveniencia que suele usar tu EnergyMeter para holding registers.
@@ -72,7 +72,7 @@ public:
     /**
      * @brief Devuelve un dato del buffer (equivalente a read() en tus ejemplos).
      */
-    virtual uint16_t getAvailableData() = 0;
+    //virtual uint16_t getAvailableData() = 0;
 
     // --- Métodos de Escritura ---
 

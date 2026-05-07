@@ -34,7 +34,7 @@ bool EnergyMeter750::executeRequest(EM_request req) {
         //Serial.print(19000 + i);
         //Serial.print(": ");
         //Serial.println(modbus.getAvailableData());
-        _internalBuffer[i] = _modbus->getAvailableData(); 
+        _internalBuffer[i] = _modbus->read(); 
         }
         _lastReadSize = i; 
         return true; 
@@ -61,5 +61,5 @@ rawDataBuffer EnergyMeter750::readDataBuffer(){
 uint16_t EnergyMeter750::readRegByAdress(uint16_t addr){
     _modbus->readHoldingRegisters(addr, 1);
     //_modbus->requestFrom(_slaveAddress, INPUT_REGISTERS, addr, 1);
-    return  _modbus->getAvailableData();
+    return  _modbus->read();
 }

@@ -80,7 +80,7 @@ bool ModbusTCPManager::writeHoldingRegister(uint16_t address, uint16_t value) {
 }
 
 
-uint16_t ModbusTCPManager::getAvailableData() {
+uint16_t ModbusTCPManager::read() {
   return _modbusClient.read();
 }
 
@@ -99,8 +99,14 @@ void ModbusTCPManager::setIpServer(IPAddress server){
     _serverIP = server;
 }
 
-bool ModbusTCPManager::isConnected() {
+bool ModbusTCPManager::connected() {
   return _modbusClient.connected();
+}
+
+// Implementación del request genérico
+bool ModbusTCPManager::requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb){
+    if (!ensureConnection()) return false;
+    return _modbusClient.requestFrom(slaveAddress, type, address, nb);
 }
 
 /*
