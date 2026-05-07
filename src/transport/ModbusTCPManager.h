@@ -59,7 +59,7 @@ class ModbusTCPManager : public ModbusTransport {
     bool readHoldingRegisters(uint16_t address, uint16_t quantity) override;
     bool readCoils(int address, int quantity) override; 
     
-    void setIpServer(IPAddress server);
+    //void setIpServer(IPAddress server); // todo pensar en su poner o no
 };
 
 #endif

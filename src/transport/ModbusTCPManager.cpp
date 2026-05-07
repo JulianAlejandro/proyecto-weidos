@@ -95,9 +95,10 @@ bool ModbusTCPManager::writeCoil(uint16_t address, bool value) {
 /**
  * @brief Mantenemos tu método original por si el EnergyMeter lo usa directamente.
  */
+ /*
 void ModbusTCPManager::setIpServer(IPAddress server){
     _serverIP = server;
-}
+}*/
 
 bool ModbusTCPManager::connected() {
   return _modbusClient.connected();

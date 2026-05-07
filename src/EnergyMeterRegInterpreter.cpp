@@ -2,8 +2,9 @@
 #include <Arduino.h>
 
 #include "devices/EnergyMeter750.h"
-#include "Datalogger.h"
+#include "services/Datalogger.h"
 #include <RTClib.h>
+
 
 /*
 struct InterpreterContext {
@@ -22,7 +23,7 @@ struct StreamContext {
 
 // Constructor: Inicializamos el puntero al manager de la SD
 EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager) 
-  : _sd(sdManager), mb_csv(sdManager) // <--- Inicialización crucial
+  : _sd(sdManager) // <--- Inicialización crucial
 {
     _registrySize = 0;
 
@@ -478,41 +479,24 @@ Parameters EnergyMeterRegInterpreter::getParameters(){
     return res; 
 }
 
-void EnergyMeterRegInterpreter::advancedDatalogger(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc){
+void EnergyMeterRegInterpreter::advancedDatalogger(Struct_MBRequest r, Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc){
    
-   //primeramente se hace una lectura del fichero de modbus_read para determinar que se quiere hacer
-   // si es modbus se le pasa a al energyMter un objeto modbus para obtener su informacion
-
-    if(! mb_csv.begin()){
-        Serial.println("Fallo reg modbus request");
-        while(1);
-    }
-
-    if(!mb_csv.loadFromSDParameters()){
-        Serial.println("fallo load");    
-    }
-    
-    Serial.println(mb_csv.getDeviceName());
-    Serial.println(mb_csv.getIpAdress());
-   
-    Struct_MBRequest res = mb_csv.loadFromSDMbrequest(); 
-
         Serial.print("channel: ");
-        Serial.println(res.channel); 
+        Serial.println(r.channel); 
 
         Serial.print("start_addres: ");
-        Serial.println(res.start_addres); 
+        Serial.println(r.start_addres); 
 
         Serial.print("length: ");
-        Serial.println(res.length); 
+        Serial.println(r.length); 
 
         Serial.print("func_code: ");
-        Serial.println(res.func_code); 
+        Serial.println(r.func_code); 
 
         Serial.print("req_interval_ms: ");
-        Serial.println(res.req_interval_ms);
+        Serial.println(r.req_interval_ms);
 
-    EM_request req = startNewRequest(res.start_addres, res.length); // se actualizan todos los buffer de EMMR
+    EM_request req = startNewRequest(r.start_addres, r.length); // se actualizan todos los buffer de EMMR
 
         Serial.print("valores de req: ");
         Serial.print(req.start_addr); 

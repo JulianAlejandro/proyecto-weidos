@@ -30,7 +30,7 @@ bool EnergyMeter750::executeRequest(EM_request req) {
     }
     if(_modbus->readHoldingRegisters(req.start_addr, req.size)){
         int i = 0;
-        for (i = 0; i < req.size; i++) { // todo esto se puede mejorar tal y como esta abajo...
+        for (i = 0; i < req.size; i++) { //TODO: esto se puede mejorar tal y como esta abajo...
         //Serial.print("Registro ");
         //Serial.print(19000 + i);
         //Serial.print(": ");

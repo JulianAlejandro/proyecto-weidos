@@ -3,46 +3,32 @@
 
 //Librerias mias 
 #include "src/transport/ModbusTCPManager.h" // bajo pruebas
-//#include "src/transport/ModbusRTUManager.h"
+#include "src/transport/ModbusRTUManager.h"
 
-#include "src/Datalogger.h"
+#include "src/services/Datalogger.h"
 #include "src/devices/EnergyMeter750.h"
-#include "src/SDManager.h"
+#include "src/services/SDManager.h"
 
 #include "src/EnergyMeterRegInterpreter.h"
 //#include "src/ConfigManager.h"
-//#include "src/ModbusRequestCSV.h"
+#include "src/ModbusRequestCSV.h"
 
 #define SLAVE_ADDRESS 1 // A eliminar posiblemente MAL
 #define MODBUS_PORT 502
 
 // Configuración de red
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
-IPAddress ip(192, 168, 0, 10);
-IPAddress server(192, 168, 0, 200);
 
 RTC_DS3231 rtc;
 
 //---Objetos de Gestion 
-SDManager sd;  // gestion SD compartido
-Datalogger datalogger(&sd); // usa SD para hacer LOGs
-EnergyMeterRegInterpreter regInterpreter(&sd); // usa SD para interpretar mapa de memoria de EM
-EnergyMeter750 energy_meter; //TODO usa EM para leer por modbus TCP o RTU Slave (de momento solo modbus)
+SDManager sd;  
+Datalogger datalogger(&sd); 
+EnergyMeterRegInterpreter regInterpreter(&sd); 
+EnergyMeter750 energy_meter; 
 
 ModbusRequestCSV mb_csv(&sd);
-ModbusTCPManager modbus(server, SLAVE_ADDRESS, MODBUS_PORT); // IP del servidor y Slave ID 1
 
-unsigned long anteriorMillisModbus = 0; // Almacena la última vez que leíste
-unsigned long anteriorMillisArchivo = 0;
-
-EM_request req;              // El contador que quieres incrementar
-
-void lectura_modbus();
-void crear_nueva_sesion_log();
-
-nameColValues misTitulos;
-
-uint16_t log_interval = 5000; 
+ModbusTransport* modbus = nullptr;
 
 void setup() {
   
@@ -68,25 +54,50 @@ void setup() {
      while(1);
   }
 
-// para iniciar el modbus del energymeter necesitamos algunos datos-> los recuperamos por parte de EnergyMeterRegInterpreter
-  IPAddress otra_ip_server(192, 168, 0, 100);
+  if(! mb_csv.begin()){
+    Serial.println("Fallo reg modbus request");
+    while(1);
+  }
 
-  modbus.setIpServer(otra_ip_server);
-  modbus.begin(mac, ip); // esto va a aqui de momento
+  if(!mb_csv.loadFromSDParameters()){
+        Serial.println("fallo load");    
+  }
 
-  if(!energy_meter.begin(&modbus)){ // se le pasa el tipo de conexion y acceso a funciones de la SD 
+   // datos importantes a saber por parte de EM y su comunicacion Modbus TCP  
+  Serial.println(mb_csv.getDeviceName());
+  Serial.println(mb_csv.getIpAdress());
+  
+  Struct_MBRequest req = mb_csv.loadFromSDMbrequest(); 
+
+  if(true){ // Simulación de config TCP
+    byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
+    IPAddress ip(192, 168, 0, 10);
+    IPAddress server;
+    server.fromString(mb_csv.getIpAdress());
+
+    ModbusTCPManager* tcpModbus = new ModbusTCPManager(server, SLAVE_ADDRESS, MODBUS_PORT);
+    tcpModbus->begin(mac, ip); // Aquí sí funciona porque tcpModbus es de tipo ModbusTCPManager*
+    modbus = tcpModbus;        // Guardamos en el puntero genérico
+  } else {
+    ModbusRTUManager* rtuModbus = new ModbusRTUManager(19200, 1, 1);
+    rtuModbus->begin();        // Configuración específica de RTU si la tuviera
+    modbus = rtuModbus;
+  }
+
+  if(!energy_meter.begin(modbus)){ // se le pasa el tipo de conexion y acceso a funciones de la SD 
     Serial.println("Error al iniciar el energy meter");
     while(1);
   }
 
 // quiza no es mala idea esto... y dependiendo del tipo de puntero que reciba hacer una cosa u otra...
-  regInterpreter.advancedDatalogger(&datalogger, &energy_meter,  &rtc); // funcion bloqueante
+  regInterpreter.advancedDatalogger(req, &datalogger, &energy_meter,  &rtc); // funcion bloqueante
 
 }
 
 void loop() {
  
 }
+
 
 /*
 #include <RTClib.h>

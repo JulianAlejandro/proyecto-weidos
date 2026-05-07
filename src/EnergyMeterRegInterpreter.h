@@ -2,7 +2,7 @@
 #ifndef ENERGY_METER_INTERPRETER_H
 #define ENERGY_METER_INTERPRETER_H
 
-#include "SDManager.h"
+#include "services/SDManager.h"
 #include <CSV_Parser.h>
 //#include <vector>
 //#include "EnergyMeter750.h"
@@ -76,15 +76,13 @@ struct netDataString{
     uint16_t size; 
 };
 
-struct Parameters{
+struct Parameters{ // Datalogger parameters
     const char* log_interval;
     const char* new_file;
     const char* max_files; 
 };
 
-
 typedef void (*TitleHandler)(const char* title, void* arg);
-
 
 class EnergyMeter750;
 class Datalogger; 
@@ -95,7 +93,7 @@ class EnergyMeterRegInterpreter { // TODO Esta clase tendra que cambiar de nombr
 private:
     SDManager* _sd = nullptr; 
     EM_request _current_request; // TODO podemos pasarlo por copia y no por referencial....
-    ModbusRequestCSV mb_csv;  // objeto que lee solamente el request
+    //ModbusRequestCSV mb_csv;  // objeto que lee solamente el request
 
     void crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos);
     void lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
@@ -160,7 +158,8 @@ public:
     //TODO funciones relacionadas con la MODBUS REQUEST, EN UN FUTURO REFACTORIZAR 
     //bool modbusRequestByFile(char* filename);
 
-    void advancedDatalogger(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
+    // funcion muy avanzada que hace todo
+    void advancedDatalogger(Struct_MBRequest req, Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
 
 };
 
