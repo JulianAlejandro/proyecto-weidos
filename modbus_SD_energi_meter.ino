@@ -1,5 +1,4 @@
 
-
 #include <RTClib.h>
 
 //Librerias mias 
@@ -88,8 +87,6 @@ void setup() {
 void loop() {
  
 }
-
-
 
 /*
 #include <RTClib.h>

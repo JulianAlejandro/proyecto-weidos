@@ -3,7 +3,8 @@
 
 #include <ArduinoModbus.h>
 #include "../EnergyMeterRegInterpreter.h"
-#include "../transport/ModbusTCPManager.h" 
+//#include "../transport/ModbusTCPManager.h" 
+#include "../core/ModbusTransport.h"
 
 #define NUM_COL_REG_EM750 5
 #define MAX_MODBUS_REGS_REQUEST 125
@@ -16,7 +17,8 @@ struct rawDataBuffer {
 
 class EnergyMeter750 {
   private:
-    ModbusTCPManager* _modbus; // Usamos puntero para flexibilidad
+    //ModbusTCPManager* _modbus; // Usamos puntero para flexibilidad
+    ModbusTransport* _modbus; 
 
     uint16_t _internalBuffer[MAX_MODBUS_REGS_REQUEST];
     uint16_t _lastReadSize; 
@@ -27,7 +29,7 @@ class EnergyMeter750 {
 
     EnergyMeter750();
 
-    int begin(ModbusTCPManager* modbusTCP);
+    int begin(ModbusTransport* modbus);
 
     uint16_t readData(uint16_t addr); 
 

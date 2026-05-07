@@ -3,8 +3,9 @@
 EnergyMeter750::EnergyMeter750() {
 }
 
-int EnergyMeter750::begin(ModbusTCPManager* modbusTCP) {
-    _modbus = modbusTCP;
+int EnergyMeter750::begin(ModbusTransport* modbus) {
+    if(modbus == nullptr) return false; 
+    _modbus = modbus;
    // modbus->begin(mac, ip); // aqui faltan estos elementos.....ya van inicializados de fuera?? o como
     return true;
 }
