@@ -5,7 +5,6 @@
 #include "services/Datalogger.h"
 #include <RTClib.h>
 
-
 /*
 struct InterpreterContext {
     EnergyMeterRegInterpreter* instance;
@@ -20,6 +19,10 @@ struct StreamContext {
     uint16_t start_addr;
     uint16_t size;
 };
+
+//prototipos funciones auxiliares
+void lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
+void crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos); 
 
 // Constructor: Inicializamos el puntero al manager de la SD
 EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager) 
@@ -251,7 +254,8 @@ float EnergyMeterRegInterpreter::getFloatConversion(const uint16_t* data){
 }
 
 // solo devuelve dato si log es true
-nameColValues EnergyMeterRegInterpreter::getLastNameValues() {
+//TODO LO DE LOS LOG NO DEBERIA IR AQUI SINO EN DATALOGGER....PENSAR
+nameColValues EnergyMeterRegInterpreter::getLastNameValues() { // aqui tiene mas sentido pasar un puntero al buffer
     nameColValues res;
     int count = 0; // Índice para el buffer de destino
     
@@ -273,6 +277,7 @@ nameColValues EnergyMeterRegInterpreter::getLastNameValues() {
     res.size = count;
     return res;
 }
+
 /*
 nameColValues EnergyMeterRegInterpreter::getLastNameValues() {
     nameColValues res;
@@ -334,6 +339,8 @@ coded_format EnergyMeterRegInterpreter::stringToFormat(const char* str) {
     return FORMAT_UNKNOWN;
 }
 
+
+
 // modificada
 netDataString EnergyMeterRegInterpreter::getBufNetDataString() {
     netDataString res;
@@ -341,72 +348,15 @@ netDataString EnergyMeterRegInterpreter::getBufNetDataString() {
     int count = 0; // Índice para el buffer de destino filtrado
 
     for (int i = 0; i < _registrySize; i++) {
-        // FILTRO: Solo procesamos y añadimos si log es true
-        if (_registryBuffer[i].logEnabled == true) {
-            
-            coded_format fmt = _RawDataBuffer[i].format;
-            uint16_t* d = _RawDataBuffer[i].data;
-
-            switch (fmt) {
-                case FLOAT: {
-                    float f_val = getFloatConversion(d);
-                    snprintf(_netDataStringBuffer[i], MAX_TITLES_SIZE, "%.2f", f_val);
-                    break;
-                }
-
-                case SHORT: {
-                    int16_t s_val = (int16_t)d[0];
-                    snprintf(_netDataStringBuffer[i], MAX_TITLES_SIZE, "%d", s_val);
-                    break;
-                }
-
-                case USHORT:
-                case DFLOAT: {
-                    snprintf(_netDataStringBuffer[i], MAX_TITLES_SIZE, "%u", d[0]);
-                    break;
-                }
-
-                case INT: {
-                    int32_t i_val = (int32_t)(((uint32_t)d[0] << 16) | d[1]);
-                    snprintf(_netDataStringBuffer[i], MAX_TITLES_SIZE, "%ld", i_val);
-                    break;
-                }
-
-                case UINT: {
-                    uint32_t ui_val = ((uint32_t)d[0] << 16) | d[1];
-                    snprintf(_netDataStringBuffer[i], MAX_TITLES_SIZE, "%lu", ui_val);
-                    break;
-                }
-
-                case BYTE: {
-                    snprintf(_netDataStringBuffer[i], MAX_TITLES_SIZE, "%u", d[0] & 0xFF);
-                    break;
-                }
-
-                case LONG64: {
-                    uint64_t l_val = ((uint64_t)d[0] << 48) | ((uint64_t)d[1] << 32) | 
-                                     ((uint64_t)d[2] << 16) | (uint64_t)d[3];
-                    snprintf(_netDataStringBuffer[i], MAX_TITLES_SIZE, "%llu", l_val);
-                    break;
-                }
-
-                case STRING: {
-                    memcpy(_netDataStringBuffer[i], d, MAX_DATA_SIZE * 2);
-                    _netDataStringBuffer[i][MAX_DATA_SIZE * 2] = '\0'; 
-                    break;
-                }
-
-                default:
-                    snprintf(_netDataStringBuffer[i], MAX_TITLES_SIZE, "n/a");
-                    break;
-            }
+        if(_registryBuffer[i].logEnabled == true){
+            getNetDataString(_netDataStringBuffer[i], _RawDataBuffer[i]);
 
             // Asignamos al buffer de salida usando el índice compacto 'count'
             if (count < MAX_MODBUS_REGS) {
                 res.buffer[count] = _netDataStringBuffer[i];
                 count++;
             }
-        }
+        }     
     }
 
     res.size = count; // El tamaño final es el número de elementos que pasaron el filtro
@@ -479,44 +429,22 @@ Parameters EnergyMeterRegInterpreter::getParameters(){
     return res; 
 }
 
-void EnergyMeterRegInterpreter::advancedDatalogger(Struct_MBRequest r, Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc){
+
+
+void EnergyMeterRegInterpreter::advancedDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc){
    
-        Serial.print("channel: ");
-        Serial.println(r.channel); 
-
-        Serial.print("start_addres: ");
-        Serial.println(r.start_addres); 
-
-        Serial.print("length: ");
-        Serial.println(r.length); 
-
-        Serial.print("func_code: ");
-        Serial.println(r.func_code); 
-
-        Serial.print("req_interval_ms: ");
-        Serial.println(r.req_interval_ms);
-
-    EM_request req = startNewRequest(r.start_addres, r.length); // se actualizan todos los buffer de EMMR
-
-        Serial.print("valores de req: ");
-        Serial.print(req.start_addr); 
-        Serial.print(" size: ");
-        Serial.println(req.size); 
+   // se actualiza el buffer de _registryBuffer
+    EM_request EM_req = startNewRequest(MB_req.start_addres, MB_req.length); // se actualizan todos los buffer de EMMR
+    //MB_req.channel;
+    //MB_req.func_code; // ESTO VA CON EL ENERGY METER
 
     nameColValues misTitulos = getLastNameValues(); // esto es mas facil
 
-    loadParametersMapRegister(); 
 
+    loadParametersMapRegister(); 
     Parameters param = getParameters(); // esto es mas facil
 
     int log_interval = atoi(param.log_interval);
-
-    
-    Serial.print("el tiempo de log: "); 
-    Serial.println(log_interval);
-
-    delay(5000); // esperamos 5 segundos
-    Serial.println("Empieza el loop");
 
     crear_nueva_sesion_log(datalogger, rtc, &misTitulos);
 
@@ -530,7 +458,7 @@ void EnergyMeterRegInterpreter::advancedDatalogger(Struct_MBRequest r, Datalogge
         // ---  ---
         if (actualMillis - anteriorMillisModbus >= log_interval) { // modificar 
             anteriorMillisModbus = actualMillis;
-            lectura_modbus(datalogger, rtc, em, req);       
+            lectura_modbus(datalogger, rtc, em, EM_req);       
         }
 
         // --- Bucle de nueva sesión de log ---
@@ -544,7 +472,71 @@ void EnergyMeterRegInterpreter::advancedDatalogger(Struct_MBRequest r, Datalogge
 
 }
 
-void EnergyMeterRegInterpreter::crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos){
+
+void EnergyMeterRegInterpreter::getNetDataString(char* dest, rawDataReg rawRegister){
+    coded_format fmt = rawRegister.format;
+    uint16_t* d = rawRegister.data;
+
+    switch (fmt) {
+    case FLOAT: {
+        float f_val = getFloatConversion(d);
+        snprintf(dest, MAX_TITLES_SIZE, "%.2f", f_val);
+        break;
+    }
+
+    case SHORT: {
+        int16_t s_val = (int16_t)d[0];
+        snprintf(dest, MAX_TITLES_SIZE, "%d", s_val);
+        break;
+    }
+
+    case USHORT:
+    case DFLOAT: {
+        snprintf(dest, MAX_TITLES_SIZE, "%u", d[0]);
+        break;
+    }
+
+    case INT: {
+        int32_t i_val = (int32_t)(((uint32_t)d[0] << 16) | d[1]);
+        snprintf(dest, MAX_TITLES_SIZE, "%ld", i_val);
+        break;
+        }
+
+    case UINT: {
+        uint32_t ui_val = ((uint32_t)d[0] << 16) | d[1];
+        snprintf(dest, MAX_TITLES_SIZE, "%lu", ui_val);
+        break;
+    }
+
+    case BYTE: {
+        snprintf(dest, MAX_TITLES_SIZE, "%u", d[0] & 0xFF);
+        break;
+    }
+
+    case LONG64: {
+        uint64_t l_val = ((uint64_t)d[0] << 48) | ((uint64_t)d[1] << 32) | ((uint64_t)d[2] << 16) | (uint64_t)d[3];
+        snprintf(dest, MAX_TITLES_SIZE, "%llu", l_val);
+        break;
+    }
+
+    case STRING: {
+        memcpy(dest, d, MAX_DATA_SIZE * 2);
+        dest[MAX_DATA_SIZE * 2] = '\0'; 
+        break;
+    }
+
+    default:
+        snprintf(dest, MAX_TITLES_SIZE, "n/a");
+        break;
+    }
+
+} 
+
+
+
+//---------funciones auxiliares------------------
+
+void crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos){
     DateTime ahora = rtc->now();
     char nombreFichero[25]; 
 
@@ -588,6 +580,9 @@ void EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_DS323
     now.year(), now.month(), now.day(), 
     now.hour(), now.minute(), now.second());
 
+    Serial.print("tamaño de datos: "); 
+    Serial.println(res.size);
+
     if(!datalogger->writeRow(bufferTime, res.buffer, res.size)){
         Serial.println("Error escribiendo en SD"); 
     } 
@@ -595,4 +590,3 @@ void EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_DS323
     datalogger->printLogToSerial();
   }
 }
-

@@ -1,4 +1,3 @@
-
 #include <RTClib.h>
 
 //Librerias mias 
@@ -69,6 +68,7 @@ void setup() {
   
   Struct_MBRequest req = mb_csv.loadFromSDMbrequest(); 
 
+// aqui se da que en req detectamos que es una conexion Modbus TCP 
   if(true){ // Simulación de config TCP
     byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
     IPAddress ip(192, 168, 0, 10);
@@ -76,7 +76,7 @@ void setup() {
     server.fromString(mb_csv.getIpAdress());
 
     ModbusTCPManager* tcpModbus = new ModbusTCPManager(server, SLAVE_ADDRESS, MODBUS_PORT);
-    tcpModbus->begin(mac, ip); // Aquí sí funciona porque tcpModbus es de tipo ModbusTCPManager*
+    tcpModbus ->begin(mac, ip); // Aquí sí funciona porque tcpModbus es de tipo ModbusTCPManager*
     modbus = tcpModbus;        // Guardamos en el puntero genérico
   } else {
     ModbusRTUManager* rtuModbus = new ModbusRTUManager(19200, 1, 1);
@@ -88,10 +88,8 @@ void setup() {
     Serial.println("Error al iniciar el energy meter");
     while(1);
   }
-
 // quiza no es mala idea esto... y dependiendo del tipo de puntero que reciba hacer una cosa u otra...
   regInterpreter.advancedDatalogger(req, &datalogger, &energy_meter,  &rtc); // funcion bloqueante
-
 }
 
 void loop() {

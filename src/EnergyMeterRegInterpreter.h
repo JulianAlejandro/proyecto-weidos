@@ -95,9 +95,6 @@ private:
     EM_request _current_request; // TODO podemos pasarlo por copia y no por referencial....
     //ModbusRequestCSV mb_csv;  // objeto que lee solamente el request
 
-    void crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos);
-    void lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
-
 //TODO aqui podemos hacer un destrozo
     RegisterEntry _registryBuffer[MAX_MODBUS_REGS];
 
@@ -115,12 +112,15 @@ private:
     char _new_file[MAX_TEXT_SIZE]; 
     char _max_files[MAX_TEXT_SIZE];
    
-    //bool splitString(char* linea, char div_char, reg_EM_750 &resultado); // funcion de apoyo para obtener valores de registro en Strings
     int getFormatSize(coded_format f); // Convierte un enum en valores de int para obtener el tamaño de cada registro
 
-    //void handleLine(char* line, uint16_t start, uint16_t size); // funciones para callback
-    //static void staticCallback(const char* line, void* context);
 
+    // Funciones auxiliares para procesamiento de informacion y log 
+    static void getNetDataString(char* dest, rawDataReg rawRegister);
+
+    //void crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos);
+    //TODO esta funcion va aqui
+    void lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
     void processParserData(CSV_Parser& cp, uint16_t start, uint16_t size);
 
 public:
