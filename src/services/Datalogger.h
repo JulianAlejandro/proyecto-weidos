@@ -5,42 +5,94 @@
 #include "SDManager.h"
 
 #define MAX_LOG_FILES 30
-#define FILE_NAME_SIZE 32 // Formato 8.3 (ej: LOG_0001.TXT)
+#define FILE_NAME_SIZE 32 // Supports full path (e.g., /LOGS/YYMMDDHH.txt)
 #define DIR_LOG_NAME "/LOGS"
 
-// TODO ANALIZAR LAS POSIBILIDADES DE SI DISPONE DE EL TIMESTAMP O NO
+/**
+ * @class Datalogger
+ * @brief Manages circular logging, file creation, and structured data writing to SD.
+ */
 class Datalogger {
 private:
-char _filenames[MAX_LOG_FILES][FILE_NAME_SIZE]; // TODO mirar
-    uint16_t _fileCount; 
-    char _currentLogFile[FILE_NAME_SIZE]; // El archivo activo actualmente
-    SDManager* _sd;
+    char _filenames[MAX_LOG_FILES][FILE_NAME_SIZE]; // Array to store existing log paths
+    uint16_t _fileCount;                            // Current number of logged files
+    char _currentLogFile[FILE_NAME_SIZE];           // Path of the currently active log
+    SDManager* _sd;                                 // Pointer to the SD hardware manager
 
+    /**
+     * @brief Checks if a file has a valid logging extension (.log or .txt).
+     */
     bool hasLogExtension(const char* filename);
+
+    /**
+     * @brief Internal logic to add a new file to the system. 
+     * Handles circular buffer (deleting oldest) and duplicate naming.
+     */
     bool addAndSetLogFile(const char* filename);
 
 public:
+    /**
+     * @brief Constructor.
+     * @param sdManager Pointer to an initialized SDManager instance.
+     */
     Datalogger(SDManager* sdManager);
 
+    /**
+     * @brief Initializes the logging directory and scans existing files.
+     * @return true if the directory is ready.
+     */
     bool begin();
 
+    /**
+     * @brief Starts a new session: creates file, clears it, and writes the header.
+     * @param name Desired filename.
+     * @param titles Array of column titles.
+     * @param numTitles Number of titles provided.
+     */
     bool newSesion(const char * name, const char** titles, uint16_t numTitles);
 
-    bool newLog(const char* name); // Añadir esta línea
+    /**
+     * @brief Prepares a new log file path and registers it in the system.
+     */
+    bool newLog(const char* name);
 
+    /**
+     * @brief Scans the /LOGS directory to populate internal file tracking.
+     */
     void scanExistingLogs();
-    //void setLogFile(const char* filename);
 
+    /**
+     * @brief Sets the active log file by its index in the internal array.
+     */
     void selectLogByIndex(uint16_t index);
 
+    /**
+     * @brief Writes a CSV-formatted header to the current log file.
+     */
     bool writeHeader(const char** titulos, uint16_t numTitulos); 
+
+    /**
+     * @brief Writes a single row of data with a timestamp.
+     * @param timestamp String representing the current time.
+     * @param values Array of string values to be logged.
+     * @param numValues Number of values in the array.
+     */
     bool writeRow(const char* timestamp, const char** values, uint16_t numValues);
 
+    /**
+     * @brief Truncates the current log file to zero size.
+     */
     void clearLogFile();
+
+    /**
+     * @brief Dumps the content of the current log file to the Serial monitor.
+     */
     void printLogToSerial();
 
+    /**
+     * @brief Physically deletes all log files within the /LOGS directory.
+     */
     void clearAllLogs();
-
 };
 
 #endif

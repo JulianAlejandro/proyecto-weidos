@@ -1,120 +1,108 @@
-
 #ifndef MODBUS_TCP_MANAGER_H
 #define MODBUS_TCP_MANAGER_H
 
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
-#include "../core/ModbusTransport.h" // 1. Incluimos la interfaz
+#include "../core/ModbusTransport.h" 
 
-// 2. Heredamos de ModbusTransport
+/**
+ * @class ModbusTCPManager
+ * @brief Handles Modbus TCP communications by implementing the ModbusTransport interface.
+ * * This class manages Ethernet client connections, automatic reconnections, 
+ * and standard Modbus TCP transactions.
+ */
 class ModbusTCPManager : public ModbusTransport {
   private:
-    IPAddress _serverIP;
-    uint16_t _port;
-    uint8_t _slaveID;
-    EthernetClient _ethClient;
-    ModbusTCPClient _modbusClient;
+    IPAddress _serverIP;         ///< IP Address of the Modbus TCP Server/Slave
+    uint16_t _port;              ///< TCP Port (Default is 502)
+    uint8_t _slaveID;            ///< Unit Identifier (Slave Address)
+    EthernetClient _ethClient;   ///< Underlying Ethernet client
+    ModbusTCPClient _modbusClient; ///< High-level Modbus TCP client
 
+    /**
+     * @brief Internal helper to verify and maintain the TCP connection.
+     * @return true if connection is active or successfully restored.
+     */
     bool ensureConnection();
 
   public:
+    /**
+     * @brief Constructor for the TCP Manager.
+     * @param server IPAddress of the target server.
+     * @param slaveID Unit ID (Default is 1).
+     * @param port TCP Port (Default is 502).
+     */
     ModbusTCPManager(IPAddress server, uint8_t slaveID = 1, uint16_t port = 502) 
       : _modbusClient(_ethClient), _serverIP(server), _port(port), _slaveID(slaveID) {}
 
-    // --- IMPLEMENTACIÓN DE LA INTERFAZ (MÉTODOS VIRTUALES) ---
+    // --- INTERFACE IMPLEMENTATION (VIRTUAL METHODS) ---
 
-    // Cambiamos void por bool para cumplir con la interfaz
+    /**
+     * @brief Standard initialization from interface.
+     * @return true if communication with the server is established.
+     */
     bool begin() override; 
     
-    // Sobrecarga para mantener tu lógica de inicialización de red
+    /**
+     * @brief Hardware-specific initialization for the Ethernet shield.
+     * @param mac Hardware MAC address array.
+     * @param localIP Static IP assigned to the device.
+     */
     void begin(byte mac[], IPAddress localIP);
 
+    /**
+     * @brief Checks the current connection status.
+     * @return true if connected to the Modbus server.
+     */
     bool connected() override; 
-    //bool connected() override { return isConnected(); }
 
-    // Implementación del request genérico
+    /**
+     * @brief Generic request for Modbus data.
+     * @param slaveAddress Unit ID (overwrites default if needed).
+     * @param type Register type (COILS, HOLDING_REGISTERS, etc.).
+     * @param address Starting memory address.
+     * @param nb Number of registers/coils to request.
+     * @return true if the request was successfully sent and acknowledged.
+     */
     bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) override;
 
-    // Implementación de lectura
-    //long read() override { return _modbusClient.read(); }
-    
+    /**
+     * @brief Reads the next available value from the response buffer.
+     * @return 16-bit register value or coil state.
+     */
     uint16_t read() override;
 
-    // Métodos de escritura (ajustados los nombres a la interfaz)
+    /**
+     * @brief Writes a single 16-bit value to a Holding Register.
+     * @param address Target register address.
+     * @param value Value to write.
+     * @return true if write was successful.
+     */
     bool writeHoldingRegister(uint16_t address, uint16_t value) override;
 
+    /**
+     * @brief Writes a single boolean value to a Coil.
+     * @param address Target coil address.
+     * @param value Boolean state to write.
+     * @return true if write was successful.
+     */
     bool writeCoil(uint16_t address, bool value) override;
 
-    // Implementación del configurador genérico
-    /*
-    void setConfig(void* configData) override {
-        // Ejemplo: si pasas un puntero a IPAddress
-        if (configData != nullptr) {
-            _serverIP = *(IPAddress*)configData;
-        }
-    }
-*/
-    // --- TUS MÉTODOS ORIGINALES (OPCIONALES) ---
-    // Puedes mantenerlos por compatibilidad o eliminarlos si usas requestFrom
+    /**
+     * @brief Interface specific implementation for reading Holding Registers.
+     * @param address Starting address.
+     * @param quantity Number of registers.
+     * @return true if successful.
+     */
     bool readHoldingRegisters(uint16_t address, uint16_t quantity) override;
+
+    /**
+     * @brief Interface specific implementation for reading Coils.
+     * @param address Starting address.
+     * @param quantity Number of coils.
+     * @return true if successful.
+     */
     bool readCoils(int address, int quantity) override; 
-    
-    //void setIpServer(IPAddress server); // todo pensar en su poner o no
 };
 
 #endif
-
-/*
-#ifndef MODBUS_TCP_MANAGER_H
-#define MODBUS_TCP_MANAGER_H
-
-#include <Ethernet.h>
-#include <ArduinoModbus.h>
-
-class ModbusTCPManager {
-  private:
-    IPAddress _serverIP;
-    uint16_t _port;
-    uint8_t _slaveID;
-    EthernetClient _ethClient;
-    ModbusTCPClient _modbusClient;
-
-    // Método privado para asegurar que estamos conectados antes de operar
-    bool ensureConnection();
-
-  public:
-    // Constructor
-    ModbusTCPManager(IPAddress server, uint8_t slaveID = 1, uint16_t port = 502) 
-      : _modbusClient(_ethClient) {
-      _serverIP = server;
-      _port = port;
-      _slaveID = slaveID;
-    }
-
-    // Inicialización (se llama en el setup)
-    void begin(byte mac[], IPAddress localIP);
-
-    void setIpServer(IPAddress server); 
-
-    // --- MÉTODOS DE LECTURA ---
-
-    bool readCoils(int address, int quantity);
-
-    bool readHoldingRegisters(int address, int quantity);
-
-    // Recupera el dato después de un request exitoso
-    long getAvailableData();
-
-    // --- MÉTODOS DE ESCRITURA ---
-
-    bool writeHoldingRegister(int address, uint16_t value);
-
-    bool writeCoil(int address, bool value);
-
-    // Check de estado
-    bool isConnected();
-};
-
-#endif
-
-*/

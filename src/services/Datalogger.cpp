@@ -1,44 +1,34 @@
 #include "Datalogger.h"
 
+/**
+ * @brief Initialize members and clear internal buffers.
+ */
 Datalogger::Datalogger(SDManager* sdManager) : _sd(sdManager), _fileCount(0) {
     memset(_filenames, 0, sizeof(_filenames));
     _currentLogFile[0] = '\0';
-    //memset(_currentLogFile, 0, sizeof(_currentLogFile));
 }
 
+/**
+ * @brief Sets up the directory structure and performs an initial scan of the SD card.
+ */
 bool Datalogger::begin() {
-    if (!_sd->isReady()) {
-        //Serial.println(F("Datalogger: SDManager no detectado."));
-        return false;
-    }
+    if (!_sd->isReady()) return false;
 
-    // 1. Usar el define para crear el directorio
-    if (!_sd->createDirectory(DIR_LOG_NAME)) {
-        //Serial.print(F("Datalogger: Error al crear "));
-        //Serial.println(F(DIR_LOG_NAME));
-        return false;
-    }
+    // Create the base log directory if it doesn't exist
+    if (!_sd->createDirectory(DIR_LOG_NAME)) return false;
 
     scanExistingLogs();
-
-/*
-    if (_fileCount == 0) {
-        // 2. Usar la nueva función para el log por defecto
-        if (!newLog("log.txt")) {
-            return false;
-        }
-    } else {
-        selectLogByIndex(_fileCount - 1);
-    }
-*/
-    //archivo actual esta vacio. 
+    
+    // Ensure the current log pointer is empty until a session starts
     memset(_currentLogFile, 0, sizeof(_currentLogFile));
-
     return true;
 }
 
+/**
+ * @brief Scans the directory to track existing logs. 
+ * Enables the "Delete Oldest" feature by knowing what is already on the card.
+ */
 void Datalogger::scanExistingLogs() {
-    // 3. Abrir el directorio usando el define
     File root = SD.open(DIR_LOG_NAME); 
     if (!root || !root.isDirectory()) return;
 
@@ -52,7 +42,7 @@ void Datalogger::scanExistingLogs() {
             const char* name = entry.name();
             
             if (hasLogExtension(name) && _fileCount < MAX_LOG_FILES) {
-                // 4. Construir ruta completa usando el define
+                // Store full path for direct SD access
                 snprintf(_filenames[_fileCount], FILE_NAME_SIZE, "%s/%s", DIR_LOG_NAME, name);
                 _fileCount++;
             }
@@ -62,97 +52,59 @@ void Datalogger::scanExistingLogs() {
     root.close();
 }
 
+/**
+ * @brief Checks for valid file extensions (.txt or .log) using case-insensitive comparison.
+ */
 bool Datalogger::hasLogExtension(const char* filename) {
     size_t len = strlen(filename);
     if (len < 4) return false;
     
-    // Buscamos ".log" o ".txt" al final (case insensitive o simple)
     const char* ext = filename + len - 4;
     return (strcasecmp(ext, ".log") == 0 || strcasecmp(ext, ".txt") == 0);
 }
 
-// Nueva función solicitada
+/**
+ * @brief Formats a filename with the system directory and triggers creation logic.
+ */
 bool Datalogger::newLog(const char* name) {
     char fullPath[FILE_NAME_SIZE];
-    
-    // Concatenamos el directorio y el nombre: "/LOGS/nombre"
-    // El formato "%s/%s" asegura que haya una barra entre el dir y el archivo
     snprintf(fullPath, sizeof(fullPath), "%s/%s", DIR_LOG_NAME, name);
-    
     return addAndSetLogFile(fullPath);
 }
 
-
+/**
+ * @brief Core logic for file rotation and creation.
+ * 1. If the limit is reached, deletes the alphabetically "smallest" file (oldest date).
+ * 2. If the filename already exists, appends a counter (e.g., _1, _2).
+ */
 bool Datalogger::addAndSetLogFile(const char* filename) {
-    // 1. Si ya alcanzamos el máximo, borramos el más antiguo antes de seguir
+    // 1. Manage Circular Buffer: Delete oldest if full
     if (_fileCount >= MAX_LOG_FILES) {
-        int indiceAntiguo = 0;
+        int oldestIndex = 0;
         
-        // Buscamos el archivo con el nombre "menor" (alfabéticamente)
+        // Find the "smallest" string (Format YYMMDDHH works perfectly here)
         for (int i = 1; i < _fileCount; i++) {
-            if (strcmp(_filenames[i], _filenames[indiceAntiguo]) < 0) {
-                indiceAntiguo = i;
+            if (strcmp(_filenames[i], _filenames[oldestIndex]) < 0) {
+                oldestIndex = i;
             }
         }
 
-        // Borrar físicamente de la SD
-        if (SD.remove(_filenames[indiceAntiguo])) {
-            // "Compactar" el array: mover los archivos posteriores una posición atrás
-            for (int i = indiceAntiguo; i < _fileCount - 1; i++) {
+        // Delete from SD and shift array to maintain order
+        if (SD.remove(_filenames[oldestIndex])) {
+            for (int i = oldestIndex; i < _fileCount - 1; i++) {
                 strncpy(_filenames[i], _filenames[i + 1], FILE_NAME_SIZE);
             }
-            _fileCount--; // Ahora hay un hueco libre
+            _fileCount--; 
         } else {
-            // Si no se pudo borrar (archivo bloqueado o error SD), abortamos
-            return false; 
+            return false; // SD Error or file locked
         }
     }
 
-    // 2. Lógica para evitar duplicados (log_1.txt, etc.)
-   char baseName[FILE_NAME_SIZE];
-    char extension[10];
-    char finalPath[FILE_NAME_SIZE];
-    
-    const char *dot = strrchr(filename, '.');
-    if (dot) {
-        size_t baseLen = dot - filename; // Declarada aquí
-        strncpy(baseName, filename, baseLen);
-        baseName[baseLen] = '\0'; // Aquí funciona
-        strncpy(extension, dot, sizeof(extension) - 1);
-        extension[sizeof(extension) - 1] = '\0';
-    } else {
-        // ERROR AQUÍ: baseLen no existe en este bloque
-        strncpy(baseName, filename, sizeof(baseName) - 1);
-        baseName[sizeof(baseName) - 1] = '\0'; // Úsalo así para cerrar el string
-        extension[0] = '\0';
-    }
-    uint16_t counter = 0;
-    strncpy(finalPath, filename, FILE_NAME_SIZE - 1);
-
-    while (_sd->exists(finalPath)) {
-        counter++;
-        snprintf(finalPath, FILE_NAME_SIZE, "%s_%u%s", baseName, counter, extension);
-        if (counter > 999) break; 
-    }
-
-    // 3. Guardar el nuevo archivo en el array y establecer como actual
-    strncpy(_filenames[_fileCount], finalPath, FILE_NAME_SIZE - 1);
-    _filenames[_fileCount][FILE_NAME_SIZE - 1] = '\0';
-    strncpy(_currentLogFile, _filenames[_fileCount], FILE_NAME_SIZE - 1);
-    
-    _fileCount++;
-    
-    return _sd->createFile(_currentLogFile);
-}
-/*
-bool Datalogger::addAndSetLogFile(const char* filename) {
-    if (_fileCount >= MAX_LOG_FILES) return false;
-
+    // 2. Prevent Duplicates (Logic to handle filename collisions)
     char baseName[FILE_NAME_SIZE];
     char extension[10];
     char finalPath[FILE_NAME_SIZE];
     
-    // 1. Separar el nombre base de la extensión (ej: "/LOGS/log" y ".txt")
     const char *dot = strrchr(filename, '.');
     if (dot) {
         size_t baseLen = dot - filename;
@@ -166,43 +118,41 @@ bool Datalogger::addAndSetLogFile(const char* filename) {
         extension[0] = '\0';
     }
 
-    // 2. Buscar un nombre que no exista
     uint16_t counter = 0;
     strncpy(finalPath, filename, FILE_NAME_SIZE - 1);
 
+    // Increment suffix if file already exists
     while (_sd->exists(finalPath)) {
         counter++;
-        // Crea un nombre tipo "/LOGS/log_1.txt", "/LOGS/log_2.txt", etc.
         snprintf(finalPath, FILE_NAME_SIZE, "%s_%u%s", baseName, counter, extension);
-        
-        // Seguridad para no entrar en bucle infinito si algo falla
         if (counter > 999) break; 
     }
 
-    // 3. Guardar el nombre final en nuestro almacén
+    // 3. Register the new file
     strncpy(_filenames[_fileCount], finalPath, FILE_NAME_SIZE - 1);
     _filenames[_fileCount][FILE_NAME_SIZE - 1] = '\0';
-    
-    // Establecer como archivo actual
     strncpy(_currentLogFile, _filenames[_fileCount], FILE_NAME_SIZE - 1);
     
     _fileCount++;
-    
-    // Opcional: Crear el archivo físicamente ahora para "reservarlo"
     return _sd->createFile(_currentLogFile);
 }
-*/
 
+/**
+ * @brief Selects an active log based on internal array index.
+ */
 void Datalogger::selectLogByIndex(uint16_t index) {
     if (index < _fileCount) {
         strncpy(_currentLogFile, _filenames[index], FILE_NAME_SIZE - 1);
     }
 }
 
+/**
+ * @brief Writes CSV header columns separated by semicolons.
+ */
 bool Datalogger::writeHeader(const char** titulos, uint16_t numTitulos) {
     if (numTitulos == 0 || strlen(_currentLogFile) == 0) return false;
 
-    char buffer[256]; // Buffer temporal para la línea
+    char buffer[256]; 
     buffer[0] = '\0'; 
 
     for (uint16_t i = 0; i < numTitulos; i++) {
@@ -215,94 +165,83 @@ bool Datalogger::writeHeader(const char** titulos, uint16_t numTitulos) {
     return _sd->appendLine(_currentLogFile, buffer);
 }
 
-
+/**
+ * @brief Appends a data row. Converts timestamp and value array into a semicolon-separated line.
+ */
 bool Datalogger::writeRow(const char* timestamp, const char** values, uint16_t numValues) {
-    // 1. Verificaciones de seguridad
     if (numValues == 0 || _currentLogFile[0] == '\0') return false;
 
-    // 2. Buffer para la línea completa
-    // ¡OJO! Si MAX_MODBUS_REGS es 125, 256 bytes es MUY poco. 
-    // Recomendado aumentar a 512 o 1024 según tus necesidades.
     char buffer[512]; 
-    
-    // Iniciamos el buffer con el timestamp
     snprintf(buffer, sizeof(buffer), "%s", timestamp);
 
-    // 3. Concatenamos cada valor de texto
     for (uint16_t i = 0; i < numValues; i++) {
-        // Añadimos el separador
         strncat(buffer, ";", sizeof(buffer) - strlen(buffer) - 1);
-        
-        // Añadimos el valor (que ya es una cadena de texto)
         if (values[i] != nullptr) {
             strncat(buffer, values[i], sizeof(buffer) - strlen(buffer) - 1);
         }
     }
 
-    // 4. Escribimos la línea completa en la SD
     return _sd->appendLine(_currentLogFile, buffer);
 }
 
-
-
+/**
+ * @brief Resets the current file to empty state.
+ */
 void Datalogger::clearLogFile() {
     if (strlen(_currentLogFile) > 0) {
         _sd->clearFile(_currentLogFile);
     }
 }
 
+/**
+ * @brief Prints current log path and its contents to Serial.
+ */
 void Datalogger::printLogToSerial() {
     if (strlen(_currentLogFile) == 0) return;
     
-    Serial.print(F("--- Contenido del Log: "));
+    Serial.print(F("--- Log Content: "));
     Serial.print(_currentLogFile);
     Serial.println(F(" ---"));
 
     _sd->printFileToSerial(_currentLogFile);
 }
 
-// todo poner en privado las funciones de apoyo
-// todo analizar que los titulos concuerdan con el dato.....esto en un futuro
+/**
+ * @brief Orchestrates the start of a logging session: New file -> Clear -> Header.
+ */
 bool Datalogger::newSesion(const char * name, const char** titles, uint16_t numTitles){
-
-    if(!newLog(name)){
-        return false; 
-    }
+    if(!newLog(name)) return false; 
+    
     clearLogFile();
 
-          // 2. Creamos un nuevo buffer temporal con espacio para el Timestamp (+1)
+    // Prepare header including an automatic Timestamp column
     uint16_t totalTitulos = numTitles + 1;
     const char* cabeceraCompleta[totalTitulos];
-
     cabeceraCompleta[0] = "Timestamp";
 
     for (uint16_t i = 0; i < numTitles; i++) {
         cabeceraCompleta[i + 1] = titles[i];
     }
 
-    if(! writeHeader(cabeceraCompleta, totalTitulos)){
-        return false; 
-    }
-    return true; 
+    return writeHeader(cabeceraCompleta, totalTitulos); 
 }
 
+/**
+ * @brief Wipes the /LOGS directory and resets internal tracking.
+ */
 void Datalogger::clearAllLogs() {
-    // 1. Abrir el directorio de logs
     File root = SD.open(DIR_LOG_NAME);
     if (!root || !root.isDirectory()) return;
 
-    // 2. Recorrer todos los archivos y borrarlos
     while (true) {
         File entry = root.openNextFile();
-        if (!entry) break; // No hay más archivos
+        if (!entry) break; 
 
         if (!entry.isDirectory()) {
-            const char* name = entry.name();
-            char fullPath[FILE_NAME_SIZE + 16]; // Buffer para la ruta completa
+            char fullPath[FILE_NAME_SIZE + 16]; 
+            snprintf(fullPath, sizeof(fullPath), "%s/%s", DIR_LOG_NAME, entry.name());
             
-            snprintf(fullPath, sizeof(fullPath), "%s/%s", DIR_LOG_NAME, name);
-            
-            entry.close(); // Cerramos el archivo antes de borrarlo
+            entry.close(); 
             SD.remove(fullPath); 
         } else {
             entry.close();
@@ -310,10 +249,7 @@ void Datalogger::clearAllLogs() {
     }
     root.close();
 
-    // 3. Resetear el estado interno de la clase
     _fileCount = 0;
     memset(_filenames, 0, sizeof(_filenames));
     memset(_currentLogFile, 0, sizeof(_currentLogFile));
-    
-    // Serial.println(F("Datalogger: Todos los logs han sido eliminados."));
 }

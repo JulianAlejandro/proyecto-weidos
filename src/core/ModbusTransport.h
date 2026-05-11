@@ -1,175 +1,94 @@
-
-//TODO: descomentar las funciones que estan comentadas para valorar su utilidad en mejorar el modbus
 #ifndef MODBUS_TRANSPORT_H
 #define MODBUS_TRANSPORT_H
 
 #include <Arduino.h>
 
 /**
- * @brief Tipos de registros Modbus (basados en ArduinoModbus)
- */
- 
- /*
-enum ModbusRegisterType {
-    COILS,
-    DISCRETE_INPUTS,
-    HOLDING_REGISTERS,
-    INPUT_REGISTERS
-};
-*/
-/**
- * @brief Clase Interfaz para abstraer el transporte Modbus (TCP o RTU)
+ * @class ModbusTransport
+ * @brief Abstract Interface for Modbus Communication.
+ * * This class defines the standard API for any Modbus transport layer (TCP, RTU, or ASCII).
+ * By using this interface, the EnergyMeter drivers remain decoupled from the 
+ * specific hardware implementation (Ethernet or RS485).
  */
 class ModbusTransport {
 public:
+    /**
+     * @brief Virtual destructor to ensure proper cleanup of derived classes.
+     */
     virtual ~ModbusTransport() {}
 
-    // --- Métodos de Control ---
+    // --- Control Methods ---
     
     /**
-     * @brief Inicializa el hardware/cliente. 
-     * @return true si la inicialización fue exitosa.
+     * @brief Initializes the underlying hardware, client, or bus.
+     * @return true if initialization was successful.
      */
     virtual bool begin() = 0;
 
-//todo cambiar el isConnected por connected
     /**
-     * @brief Verifica si el cliente está conectado o el bus está listo.
+     * @brief Checks if the communication channel is active.
+     * @note In TCP, this verifies the socket state. In RTU, it confirms the bus is ready.
+     * @return true if the transport is ready for transactions.
      */
-    
     virtual bool connected() = 0;
 
-    // --- Métodos de Lectura ---
+    // --- Read Methods ---
 
     /**
-     * @brief Envía una petición de lectura al esclavo.
-     * @param slaveAddress ID del esclavo (en TCP suele ser 1 o 255).
-     * @param type Tipo de registro (COILS, HOLDING_REGISTERS, etc.)
-     * @param address Dirección de inicio.
-     * @param nb Cantidad de registros/puntos.
-     * @return true si la petición fue aceptada/enviada con éxito.
+     * @brief Sends a generic Modbus request to a slave device.
+     * @param slaveAddress The Unit ID / Slave ID (typically 1 for TCP or specific ID for RTU).
+     * @param type Register type (e.g., HOLDING_REGISTERS, COILS).
+     * @param address The starting memory address for the request.
+     * @param nb The number of registers or points to read.
+     * @return true if the request was successfully accepted or acknowledged by the bus.
      */
     virtual bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) = 0;
 
     /**
-     * @brief Lee el siguiente valor del buffer de la última petición requestFrom.
-     * @return El valor leído (convertido a long para soportar diferentes tipos).
+     * @brief Fetches the next available value from the internal response buffer.
+     * @note This should be called after a successful requestFrom() or specialized read call.
+     * @return The 16-bit register value.
      */
     virtual uint16_t read() = 0;
 
     /**
-     * @brief Método de conveniencia que suele usar tu EnergyMeter para holding registers.
+     * @brief Specialized request for Holding Registers (Function Code 03/04).
+     * @param address Starting address.
+     * @param quantity Number of registers to read.
+     * @return true if the transaction succeeded.
      */
-     /*
-    virtual bool readHoldingRegisters(uint16_t address, uint16_t quantity) {
-        // Implementación por defecto usando el requestFrom genérico
-        return requestFrom(1, HOLDING_REGISTERS, address, quantity);
-    }
-    */
     virtual bool readHoldingRegisters(uint16_t address, uint16_t quantity) = 0; 
-    virtual bool readCoils(int address, int quantity) = 0;
-
-    /**
-     * @brief Devuelve un dato del buffer (equivalente a read() en tus ejemplos).
-     */
-    //virtual uint16_t getAvailableData() = 0;
-
-    // --- Métodos de Escritura ---
-
-    virtual bool writeHoldingRegister(uint16_t address, uint16_t value) = 0;
-    virtual bool writeCoil(uint16_t address, bool value) = 0;
-
-    // --- Configuración (Lo que hablamos del JSON) ---
     
     /**
-     * @brief Permite al Orquestador configurar IP/Puerto o Baudrate/ID 
-     * pasando un puntero a los datos (puede ser un JSON o estructura).
+     * @brief Specialized request for Coils (Function Code 01).
+     * @param address Starting address.
+     * @param quantity Number of coils to read.
+     * @return true if the transaction succeeded.
      */
-    //virtual void setConfig(void* configData) = 0;
+    virtual bool readCoils(int address, int quantity) = 0;
+
+    // --- Write Methods ---
+
+    /**
+     * @brief Writes a single 16-bit value to a Holding Register.
+     * @param address Target memory address.
+     * @param value The value to write.
+     * @return true if the write operation was confirmed.
+     */
+    virtual bool writeHoldingRegister(uint16_t address, uint16_t value) = 0;
+
+    /**
+     * @brief Writes a single boolean state to a Coil.
+     * @param address Target coil address.
+     * @param value State to write (true/false).
+     * @return true if the write operation was confirmed.
+     */
+    virtual bool writeCoil(uint16_t address, bool value) = 0;
+
+    /* * FUTURE ENHANCEMENTS (Currently Commented):
+     * * virtual void setConfig(void* configData) = 0; 
+     * This allows runtime configuration updates (IP/Baudrate) via JSON or structs.
+     */
 };
 
 #endif
-
-
-//#ifndef MODBUS_TRANSPORT_H
-//#define MODBUS_TRANSPORT_H
-//
-//#include <Arduino.h>
-//
-///**
-// * @brief Tipos de registros Modbus (basados en ArduinoModbus)
-// */
-//enum ModbusRegisterType {
-//    COILS,
-//    DISCRETE_INPUTS,
-//    HOLDING_REGISTERS,
-//    INPUT_REGISTERS
-//};
-//
-///**
-// * @brief Clase Interfaz para abstraer el transporte Modbus (TCP o RTU)
-// */
-//class ModbusTransport {
-//public:
-//    virtual ~ModbusTransport() {}
-//
-//    // --- Métodos de Control ---
-//    
-//    /**
-//     * @brief Inicializa el hardware/cliente. 
-//     * @return true si la inicialización fue exitosa.
-//     */
-//    virtual bool begin() = 0;
-//
-//    /**
-//     * @brief Verifica si el cliente está conectado o el bus está listo.
-//     */
-//    virtual bool connected() = 0;
-//
-//    // --- Métodos de Lectura ---
-//
-//    /**
-//     * @brief Envía una petición de lectura al esclavo.
-//     * @param slaveAddress ID del esclavo (en TCP suele ser 1 o 255).
-//     * @param type Tipo de registro (COILS, HOLDING_REGISTERS, etc.)
-//     * @param address Dirección de inicio.
-//     * @param nb Cantidad de registros/puntos.
-//     * @return true si la petición fue aceptada/enviada con éxito.
-//     */
-//    virtual bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) = 0;
-//
-//    /**
-//     * @brief Lee el siguiente valor del buffer de la última petición requestFrom.
-//     * @return El valor leído (convertido a long para soportar diferentes tipos).
-//     */
-//    virtual long read() = 0;
-//
-//    /**
-//     * @brief Método de conveniencia que suele usar tu EnergyMeter para holding registers.
-//     */
-//    virtual bool readHoldingRegisters(uint16_t address, uint16_t nb) {
-//        // Implementación por defecto usando el requestFrom genérico
-//        return requestFrom(1, HOLDING_REGISTERS, address, nb);
-//    }
-//
-//    /**
-//     * @brief Devuelve un dato del buffer (equivalente a read() en tus ejemplos).
-//     */
-//    virtual uint16_t getAvailableData() = 0;
-//
-//    // --- Métodos de Escritura ---
-//
-//    virtual bool holdingRegisterWrite(uint16_t address, uint16_t value) = 0;
-//    virtual bool coilWrite(uint16_t address, bool value) = 0;
-//
-//    // --- Configuración (Lo que hablamos del JSON) ---
-//    
-//    /**
-//     * @brief Permite al Orquestador configurar IP/Puerto o Baudrate/ID 
-//     * pasando un puntero a los datos (puede ser un JSON o estructura).
-//     */
-//    virtual void setConfig(void* configData) = 0;
-//};
-//
-//#endif
-

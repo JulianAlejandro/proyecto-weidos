@@ -1,25 +1,23 @@
-
 #ifndef ENERGY_METER_INTERPRETER_H
 #define ENERGY_METER_INTERPRETER_H
 
 #include "services/SDManager.h"
 #include <CSV_Parser.h>
-//#include <vector>
-//#include "EnergyMeter750.h"
 #include "ModbusRequestCSV.h"
 
+// Constants for Register Mapping
 #define NUM_COL_REG_EM750 5
-#define MAX_MODBUS_REGS 125 // TODO DE MOMENTO ESTE INTERPRETADOR DE REGISTROS FUNCIONA SOLO PARA MODBUS 
-#define MAX_TITLES_SIZE 32 // TODO cambiatar esto de nombre
-#define MAX_TEXT_SIZE 32
+#define MAX_MODBUS_REGS 125    ///< Limit for the number of processable Modbus registers
+#define MAX_TITLES_SIZE 32     ///< Buffer size for column names/titles
+#define MAX_TEXT_SIZE 32       ///< Buffer size for general strings
 
-#define MAX_DATA_SIZE 4 // numero maximo de tamaño que puede tener un dato en el mapa de registros 
-#define LINE_MAP_START 4
+#define MAX_DATA_SIZE 4        ///< Maximum 16-bit registers per data point (e.g., 64-bit long)
+#define LINE_MAP_START 4       ///< CSV line where the register table begins
 
 #define MAP_FILE "/EM750map.csv"
 
-// size number reg 16 bits
-#define SIZE_FLOAT   2 // 2 reg 16 bits
+// Register size definitions (Number of 16-bit Modbus registers)
+#define SIZE_FLOAT   2 
 #define SIZE_INT     2
 #define SIZE_UINT    2
 #define SIZE_LONG64  4
@@ -28,150 +26,161 @@
 #define SIZE_BYTE    1
 #define SIZE_DFLOAT  1
 
-// todo añadir algunos defines para que las columnas no se busquen hardcoded
-//#define ADDRESS 
-
+/**
+ * @enum coded_format
+ * @brief Supported data formats within the register map.
+ */
 enum coded_format { FORMAT_UNKNOWN, FLOAT, SHORT, INT, STRING, USHORT, UINT, BYTE, LONG64, DFLOAT };
 
+/**
+ * @struct RegisterEntry
+ * @brief Representation of a single row in the CSV register map.
+ */
 struct RegisterEntry {
     uint16_t address;
     coded_format format;
     char name[MAX_TITLES_SIZE];
     bool logEnabled;
-    // Optional: uint16_t modbusSize; // Pre-calculated size
 };
 
-//Estructura para realziar una solicitud de valores de registros. 
+/**
+ * @struct EM_request
+ * @brief Structure to define a Modbus range request.
+ */
 struct EM_request {
     uint16_t start_addr; 
     uint16_t size; 
 };
 
-//regustro que almacena los registros que forman un dato e informacion importante como el formato, log etc 
-// TODO esto hay qye cambiarlo 
+/**
+ * @struct rawDataReg
+ * @brief Container for raw 16-bit Modbus data and its format metadata.
+ */
 struct rawDataReg {
     uint16_t data[MAX_DATA_SIZE];
     coded_format format; 
-
 };
 
-// buffer de datos , estructura usada para recuperar datos procesados 
-struct bufRawDataReg{
+/**
+ * @struct bufRawDataReg
+ * @brief Helper to return a buffer of processed raw data.
+ */
+struct bufRawDataReg {
     rawDataReg* buffer;
     uint16_t size; 
 };
 
-// TODO pensar en si es aconsejable esto
-//enum index_col_regs {ADDRESS, FORMAT, UNIT, NAME, LOG};
-//enum index_parameters { NAME, VALUE };
-
-//estructura que apunta a los ultimos valores de la columna nombres 
+/**
+ * @struct nameColValues
+ * @brief Buffer of strings containing the names of columns intended for logging.
+ */
 struct nameColValues {
-    const char* buffer[MAX_MODBUS_REGS]; // Array de punteros a las cadenas
+    const char* buffer[MAX_MODBUS_REGS]; 
     uint16_t size;
 };
 
-struct netDataString{
+/**
+ * @struct netDataString
+ * @brief Buffer of strings representing formatted data ready for the log file.
+ */
+struct netDataString {
     const char* buffer[MAX_MODBUS_REGS];
     uint16_t size; 
 };
 
-struct Parameters{ // Datalogger parameters
+/**
+ * @struct Parameters
+ * @brief High-level datalogger configuration parameters extracted from CSV.
+ */
+struct Parameters {
     const char* log_interval;
     const char* new_file;
     const char* max_files; 
 };
 
-typedef void (*TitleHandler)(const char* title, void* arg);
-
+// Forward declarations
 class EnergyMeter750;
 class Datalogger; 
 class RTC_DS3231; 
 
-class EnergyMeterRegInterpreter { // TODO Esta clase tendra que cambiar de nombre a algo que gestione CSVs
+/**
+ * @class EnergyMeterRegInterpreter
+ * @brief Manages the parsing of CSV register maps and the conversion of raw Modbus data.
+ */
+class EnergyMeterRegInterpreter {
 
 private:
     SDManager* _sd = nullptr; 
-    EM_request _current_request; // TODO podemos pasarlo por copia y no por referencial....
+    EM_request _current_request; 
     bool _initialized = false; 
    
-   unsigned long anteriorMillisModbus = 0; 
-   unsigned long anteriorMillisArchivo = 0; 
-   nameColValues _misTitulos;
+    unsigned long anteriorMillisModbus = 0; 
+    unsigned long anteriorMillisArchivo = 0; 
+    nameColValues _misTitulos;
 
-   int _int_log_interval;
-   uint32_t _new_file_interval_s; 
-   int _int_max_files; 
+    int _int_log_interval;
+    uint32_t _new_file_interval_s; 
+    int _int_max_files; 
 
-   bool _advancedIsInitialized = false; 
-   
-//TODO aqui podemos hacer un destrozo
-    RegisterEntry _registryBuffer[MAX_MODBUS_REGS]; // modbus/rtu
+    bool _advancedIsInitialized = false; 
+    
+    RegisterEntry _registryBuffer[MAX_MODBUS_REGS]; 
+    uint16_t _registrySize; 
 
-    uint16_t _registrySize; // size del numero de registros almacenados en la estructura (Maximo MAX_MODBUS_REGS). 
-
-    // Este buffer solo se actualiza tras recuperar los datos de EM
-    rawDataReg _RawDataBuffer[MAX_MODBUS_REGS]; // 125 x (4x2 + 4) = 1500 bytes aprox
-
-    // Este buffer se actualiza cuando se quuiere acceder a los datos en formato string
+    rawDataReg _RawDataBuffer[MAX_MODBUS_REGS]; 
     char _netDataStringBuffer[MAX_MODBUS_REGS][MAX_TEXT_SIZE];
   
-    //TODO valorar donde poner esto
-    // estos son almacenes para mantener la persistencia de datos obtenidos en startNewRequest para estos parametros 
     char _log_interval[MAX_TEXT_SIZE]; 
     char _new_file[MAX_TEXT_SIZE]; 
     char _max_files[MAX_TEXT_SIZE];
    
-    int getFormatSize(coded_format f); // Convierte un enum en valores de int para obtener el tamaño de cada registro
-
-
-    // Funciones auxiliares para procesamiento de informacion y log 
+    int getFormatSize(coded_format f); 
     static void getNetDataString(char* dest, rawDataReg rawRegister);
-
-    //void crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos);
-    //TODO esta funcion va aqui
     void lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
     void processParserData(CSV_Parser& cp, uint16_t start, uint16_t size);
 
 public:
-    // Constructor
     EnergyMeterRegInterpreter(SDManager* sdManager);
-
     int begin();
 
-    EM_request startNewRequest (const uint16_t start_addr, const uint16_t size);
+    /**
+     * @brief Reads the SD map and filters registers based on a requested range.
+     * @return An EM_request object with the calculated total size.
+     */
+    EM_request startNewRequest(const uint16_t start_addr, const uint16_t size);
 
+    /**
+     * @brief Maps raw 16-bit arrays into the formatted rawDataReg buffer.
+     */
     bufRawDataReg getBufferDataRaw(const uint16_t* data_readed, const uint16_t size);
 
+    /**
+     * @brief Gets titles for columns where 'Log' is enabled.
+     */
     nameColValues getLastNameValues();
 
+    /**
+     * @brief Returns a buffer of formatted strings (e.g., "12.34") for the logger.
+     */
     netDataString getBufNetDataString();
-    //void getTitles(const uint16_t start_addr, const uint16_t size, TitleHandler handler, void* arg);
 
-    // Función auxiliar para convertir String a Enum
     coded_format stringToFormat(const char* str);
+    bool isReady() { return _sd != nullptr && _initialized; }
 
-    // Es buena idea tener un método para verificar si el manager está listo
-    bool isReady() { return _sd != nullptr; }
-
-    // TODO analizar si es necesario interpretar que es little endian o no
     static float getFloatConversion(const uint16_t* data);
 
-    //OBTENCION DE PARAMETROS EXISTENTES DENTRO DEL FICHERO EM750map.csv
+    /**
+     * @brief Loads global configuration (interval, max files) from the first lines of the CSV.
+     */
     void loadParametersMapRegister(); 
 
     Parameters getParameters();
-    //const char* getLogInterval() { return _log_interval; }
-    //const char* getNewFile() { return _new_file; }
-    //const char* getMaxFiles() { return _max_files; }
 
-    //TODO funciones relacionadas con la MODBUS REQUEST, EN UN FUTURO REFACTORIZAR 
-    //bool modbusRequestByFile(char* filename);
-
-    // funcion muy avanzada que hace todo
+    /**
+     * @brief Automates the entire datalogging setup and execution.
+     */
     bool prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc);
     void advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
-
 };
 
 #endif

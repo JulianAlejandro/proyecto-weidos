@@ -1,91 +1,83 @@
-//aqui copiar 
-
 #include "SDManager.h"
-
 #include <SPI.h>
 
-SDManager::SDManager() {
-    // Cuerpo vacío
-}
+/**
+ * @brief Default constructor.
+ */
+SDManager::SDManager() {}
 
-
-//SDManager::SDManager(uint8_t csPin) : _csPin(csPin), _initialized(false) {}
-
-// TODO: pensar que mas cosas tiene que hacer el administrador de SD
+/**
+ * @brief Starts the SD card hardware communication.
+ * Validates the SPI connection and FAT file system mounting.
+ */
 bool SDManager::begin() {
-    // Si ya estaba inicializada, no repetimos el proceso
+    // Avoid re-initialization if already active
     if (_initialized) return true;
 
-    // SD.begin() devuelve true si la comunicación SPI 
-    // y el sistema de archivos FAT están listos.
+    // Standard SD.begin() returns true if SPI hardware and FAT system respond
     _initialized = SD.begin(); 
     
     return _initialized;
 }
 
+/**
+ * @brief Returns the initialization status.
+ */
+bool SDManager::isReady() {
+    return _initialized;
+}
 
+/**
+ * @brief Ensures a file exists. If it doesn't, it creates an empty one.
+ */
 bool SDManager::createFile(const char* path) {
-    // Si el archivo ya existe, no hacemos nada y retornamos true
     if (SD.exists(path)) {
         return true; 
     }
-
-    // Intentamos abrirlo en modo escritura con creación (O_CREAT)
-    // Al cerrarlo inmediatamente, queda creado como un archivo vacío de 0 bytes
+    // Open in WRITE mode to force file creation
     File f = SD.open(path, FILE_WRITE);
     if (f) {
         f.close();
         return true;
     }
-
-    return false; // Error al crear (ej: tarjeta llena o nombre inválido)
+    return false; // Creation failed (e.g., SD full or invalid name)
 }
 
-bool SDManager::isReady() {
-    return _initialized;
-}
-
-/*
-bool SDManager::isReady() {
-    // Si ni siquiera se ha llamado a begin una vez, es false
-    if (!_initialized) return false;
-
-    // Intentamos verificar si el volumen sigue siendo accesible
-    // exists("/") es una operación rápida que confirma que el sistema FAT responde
-    if (!SD.exists("/")) {
-        _initialized = false; // Si falla, marcamos como no listo
-        return false;
-    }
-    
-    return true;
-}
-*/
-
+/**
+ * @brief Checks existence of a resource at the given path.
+ */
 bool SDManager::exists(const char* path) {
     return SD.exists(path);
 }
 
-//borrar el contenido dentro de un fichero
+/**
+ * @brief Overwrites an existing file with an empty state.
+ * Uses O_TRUNC to reset file size to 0.
+ */
 void SDManager::clearFile(const char* path) {
-
     File f = SD.open(path, O_WRITE | O_CREAT | O_TRUNC); 
     if (f) f.close(); 
 }
 
+/**
+ * @brief Opens file in append mode and adds a new line of data.
+ */
 bool SDManager::appendLine(const char* path, const char* data) {
     File f = SD.open(path, FILE_WRITE);
     if (!f) return false;
-    f.println(data);
+    
+    f.println(data); // Appends data + line jump (\n)
     f.close();
     return true;
-
 }
 
-
+/**
+ * @brief Utility for debugging. Prints the full file content to Serial.
+ */
 void SDManager::printFileToSerial(const char* path) {
     File f = SD.open(path, FILE_READ);
     if (!f) {
-        Serial.println(F("Error: No se pudo abrir el archivo para lectura Serial."));
+        //Serial.println(F("SDManager Error: Could not open file for Serial output."));
         return;
     }
     
@@ -95,55 +87,30 @@ void SDManager::printFileToSerial(const char* path) {
     f.close();
 }
 
-
+/**
+ * @brief Creates a directory structure.
+ */
 bool SDManager::createDirectory(const char* path) {
     if (!_initialized) return false;
 
-    // SD.exists() funciona tanto para archivos como para directorios
     if (SD.exists(path)) {
         return true; 
     }
 
-    // SD.mkdir devuelve true si tuvo éxito
     return SD.mkdir(path);
 }
 
-/*
-//devuelve cada linea del fichero en un callback
-bool SDManager::getAllLines(const char* path, LineCallback callback, void* context) {
-    if (!_initialized) return false;
-    File file = SD.open(path, FILE_READ);
-    if (!file) return false;
-
-    char lineBuffer[128];
-    while (file.available()) {
-        int bytesRead = file.readBytesUntil('\n', lineBuffer, sizeof(lineBuffer) - 1);
-        lineBuffer[bytesRead] = '\0';
-        
-        if (bytesRead > 0) {
-            // Le pasamos la línea y el contexto de vuelta al callback
-            callback(lineBuffer, context);
-        }
-    }
-    file.close();
-    return true;
-}
-*/
-
-/*
-File SDManager::getFileStream(const char* path) {
-    if (!_initialized) return File(); // Devuelve un objeto File vacío (evalúa como false)
-    
-    return SD.open(path, FILE_READ);
-}
-*/
-
+/**
+ * @brief Higher-order function to handle file streaming via callbacks.
+ * Ensures the file is safely closed after the callback execution.
+ */
 bool SDManager::withFile(const char* path, StreamCallback callback, void* context) {
     if (!_initialized) return false;
 
     File file = SD.open(path);
     if (!file) return false;
 
+    // Pass the file stream to the external processing function
     callback(file, context);
     
     file.close();

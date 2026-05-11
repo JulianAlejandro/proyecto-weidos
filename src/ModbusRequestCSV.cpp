@@ -1,34 +1,27 @@
 #include "ModbusRequestCSV.h"
 #include <CSV_Parser.h>
 
-
 ModbusRequestCSV::ModbusRequestCSV(SDManager* sdManager) {
     _sd = sdManager;
 }
 
-bool ModbusRequestCSV::begin(){
-   // analizar si el SD ya esta iniciado 
-
+bool ModbusRequestCSV::begin() {
+    // Check if SD card communication is already established
     if (!_sd->isReady()) { 
-       // Serial.println("Modbus Request: SDManager no está listo aún.");
         return false;
     }
     _initialized = true;
     return true;
-
-   /*
-    if (!_sd->begin()) {
-        Serial.println(F("Error: No se pudo iniciar la SD desde EnergyMeterRegInterpreter"));
-        return false;
-    }
-    */
 }
 
+/**
+ * @brief Loads metadata (Device Name, IP) from the CSV.
+ * @note Uses 'has_header = false' so the first line is treated as data.
+ */
 bool ModbusRequestCSV::loadFromSDParameters() {
-
-    if(!_initialized) return false; 
-    // 1. Usamos false en has_header para que la primera línea TAMBIÉN cuente como fila.
-    // Usamos "sssss" porque tu CSV tiene 5 columnas (4 separadores ';')
+    if (!_initialized) return false; 
+    
+    // CSV structure: 5 columns expected ("sssss")
     CSV_Parser cp("sssss", false, ';');
     
     bool flag = _sd->withFile(MODBUS_REQ_FILE, [](Stream& file, void* arg) {
@@ -36,7 +29,7 @@ bool ModbusRequestCSV::loadFromSDParameters() {
         for (int i = 0; i < FIRST_BLOCK; i++) {
             if (file.available()) {
                 String line = file.readStringUntil('\n');
-                line.trim(); // Limpia \r y espacios
+                line.trim(); // Remove \r and extra spaces
                 if (line.length() > 0) {
                     line += "\n"; 
                     *parser << line.c_str();
@@ -47,40 +40,31 @@ bool ModbusRequestCSV::loadFromSDParameters() {
         }
     }, &cp);
 
-    if (!flag) {
-        //Serial.println("Error: No se pudo abrir el archivo.");
-        return false;
-    }
+    if (!flag) return false;
 
     int rows = cp.getRowsCount();
-    //Serial.print("Filas totales detectadas: "); Serial.println(rows);
 
-    // Según tu CSV con has_header = false:
-    // Fila 0: "Modbus Client Requests;;;;"
-    // Fila 1: "Device Name;EM 750;;;"
-    // Fila 2: "IP address;192.168.0.202;;;"
+    // Map based on the CSV structure:
+    // Row 0: "Modbus Client Requests;;;;"
+    // Row 1: "Device Name;EM 750;;;"
+    // Row 2: "IP address;192.168.0.202;;;"
 
-    if (rows < 3) {
-        //Serial.println("Error: No hay filas suficientes en el CSV.");
-        return false; 
-    } 
+    if (rows < 3) return false; 
 
-    // Acceso directo a la columna 1 (donde están los valores)
+    // Access Column 1 where values are stored
     char **values = (char**)cp[1];
 
     if (values != nullptr) {
-        // El Device Name está en la FILA 1
+        // Load Device Name from Row 1
         if (values[1] != nullptr) {
             strncpy(_device_name, values[1], MAX_TITLES_SIZE - 1);
             _device_name[MAX_TITLES_SIZE - 1] = '\0';
-            //Serial.print("Device Name cargado: "); Serial.println(_device_name);
         }
 
-        // El IP Address está en la FILA 2
+        // Load IP Address from Row 2
         if (values[2] != nullptr) {
             strncpy(_ip_address, values[2], MAX_TITLES_SIZE - 1);
             _ip_address[MAX_TITLES_SIZE - 1] = '\0';
-            //Serial.print("IP Address cargada: "); Serial.println(_ip_address);
         }
         
         return true;
@@ -89,20 +73,18 @@ bool ModbusRequestCSV::loadFromSDParameters() {
     return false;
 }
 
-
+/**
+ * @brief Extracts the Modbus request configuration from Row 8 (Index 7) of the CSV.
+ */
 Struct_MBRequest ModbusRequestCSV::loadFromSDMbrequest() {
+    Struct_MBRequest request = {0, 0, 0, 0, 0}; 
     
+    if (!_initialized) return request; 
 
-    Struct_MBRequest request = {0, 0, 0, 0, 0}; // Inicializamos a cero
-    
-    if(!_initialized) return request; 
-
-    // Usamos "sssss" para leer strings y luego convertirlos
     CSV_Parser cp("sssss", false, ';');
 
     bool flag = _sd->withFile(MODBUS_REQ_FILE, [](Stream& file, void* arg) {
         CSV_Parser* parser = (CSV_Parser*)arg;
-        // Leemos hasta FIRST_BLOCK (que debe ser >= 8)
         for (int i = 0; i < FIRST_BLOCK; i++) {
             if (file.available()) {
                 String line = file.readStringUntil('\n');
@@ -119,16 +101,15 @@ Struct_MBRequest ModbusRequestCSV::loadFromSDMbrequest() {
 
     int rows = cp.getRowsCount();
     
-    // La fila 8 del CSV es el índice 7 para el parser
+    // CSV Row 8 corresponds to Index 7 in the parser
     if (flag && rows >= 8) {
-        // Obtenemos los punteros de cada columna
         char **col0 = (char**)cp[0]; // Channel
         char **col1 = (char**)cp[1]; // Start Address
         char **col2 = (char**)cp[2]; // Length
         char **col3 = (char**)cp[3]; // Function Code
         char **col4 = (char**)cp[4]; // Interval
 
-        // Verificamos que la fila 7 (Fila 8 del CSV) tenga datos
+        // Ensure Row 7 actually contains data
         if (col0[7] && col1[7] && col2[7] && col3[7] && col4[7]) {
             request.channel         = (uint16_t)atoi(col0[7]);
             request.start_addres    = (uint16_t)atoi(col1[7]);
