@@ -82,6 +82,69 @@ bool Datalogger::newLog(const char* name) {
     return addAndSetLogFile(fullPath);
 }
 
+
+bool Datalogger::addAndSetLogFile(const char* filename) {
+    // 1. Si ya alcanzamos el máximo, borramos el más antiguo antes de seguir
+    if (_fileCount >= MAX_LOG_FILES) {
+        int indiceAntiguo = 0;
+        
+        // Buscamos el archivo con el nombre "menor" (alfabéticamente)
+        for (int i = 1; i < _fileCount; i++) {
+            if (strcmp(_filenames[i], _filenames[indiceAntiguo]) < 0) {
+                indiceAntiguo = i;
+            }
+        }
+
+        // Borrar físicamente de la SD
+        if (SD.remove(_filenames[indiceAntiguo])) {
+            // "Compactar" el array: mover los archivos posteriores una posición atrás
+            for (int i = indiceAntiguo; i < _fileCount - 1; i++) {
+                strncpy(_filenames[i], _filenames[i + 1], FILE_NAME_SIZE);
+            }
+            _fileCount--; // Ahora hay un hueco libre
+        } else {
+            // Si no se pudo borrar (archivo bloqueado o error SD), abortamos
+            return false; 
+        }
+    }
+
+    // 2. Lógica para evitar duplicados (log_1.txt, etc.)
+   char baseName[FILE_NAME_SIZE];
+    char extension[10];
+    char finalPath[FILE_NAME_SIZE];
+    
+    const char *dot = strrchr(filename, '.');
+    if (dot) {
+        size_t baseLen = dot - filename; // Declarada aquí
+        strncpy(baseName, filename, baseLen);
+        baseName[baseLen] = '\0'; // Aquí funciona
+        strncpy(extension, dot, sizeof(extension) - 1);
+        extension[sizeof(extension) - 1] = '\0';
+    } else {
+        // ERROR AQUÍ: baseLen no existe en este bloque
+        strncpy(baseName, filename, sizeof(baseName) - 1);
+        baseName[sizeof(baseName) - 1] = '\0'; // Úsalo así para cerrar el string
+        extension[0] = '\0';
+    }
+    uint16_t counter = 0;
+    strncpy(finalPath, filename, FILE_NAME_SIZE - 1);
+
+    while (_sd->exists(finalPath)) {
+        counter++;
+        snprintf(finalPath, FILE_NAME_SIZE, "%s_%u%s", baseName, counter, extension);
+        if (counter > 999) break; 
+    }
+
+    // 3. Guardar el nuevo archivo en el array y establecer como actual
+    strncpy(_filenames[_fileCount], finalPath, FILE_NAME_SIZE - 1);
+    _filenames[_fileCount][FILE_NAME_SIZE - 1] = '\0';
+    strncpy(_currentLogFile, _filenames[_fileCount], FILE_NAME_SIZE - 1);
+    
+    _fileCount++;
+    
+    return _sd->createFile(_currentLogFile);
+}
+/*
 bool Datalogger::addAndSetLogFile(const char* filename) {
     if (_fileCount >= MAX_LOG_FILES) return false;
 
@@ -128,6 +191,7 @@ bool Datalogger::addAndSetLogFile(const char* filename) {
     // Opcional: Crear el archivo físicamente ahora para "reservarlo"
     return _sd->createFile(_currentLogFile);
 }
+*/
 
 void Datalogger::selectLogByIndex(uint16_t index) {
     if (index < _fileCount) {
@@ -178,26 +242,8 @@ bool Datalogger::writeRow(const char* timestamp, const char** values, uint16_t n
     // 4. Escribimos la línea completa en la SD
     return _sd->appendLine(_currentLogFile, buffer);
 }
-/*
-bool Datalogger::writeRow(const char* timestamp, const float* values, uint16_t numValues) {
-    if (numValues == 0 || strlen(_currentLogFile) == 0) return false;
 
-    char buffer[256];
-    // Iniciamos el buffer con el timestamp
-    snprintf(buffer, sizeof(buffer), "%s", timestamp);
 
-    for (uint16_t i = 0; i < numValues; i++) {
-        char valBuffer[15];
-        // Convertimos el float a char manualmente (2 decimales)
-        dtostrf(values[i], 1, 2, valBuffer); 
-        
-        strncat(buffer, ";", sizeof(buffer) - strlen(buffer) - 1);
-        strncat(buffer, valBuffer, sizeof(buffer) - strlen(buffer) - 1);
-    }
-
-    return _sd->appendLine(_currentLogFile, buffer);
-}
-*/
 
 void Datalogger::clearLogFile() {
     if (strlen(_currentLogFile) > 0) {

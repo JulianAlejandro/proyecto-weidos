@@ -93,10 +93,20 @@ class EnergyMeterRegInterpreter { // TODO Esta clase tendra que cambiar de nombr
 private:
     SDManager* _sd = nullptr; 
     EM_request _current_request; // TODO podemos pasarlo por copia y no por referencial....
-    //ModbusRequestCSV mb_csv;  // objeto que lee solamente el request
+    bool _initialized = false; 
+   
+   unsigned long anteriorMillisModbus = 0; 
+   unsigned long anteriorMillisArchivo = 0; 
+   nameColValues _misTitulos;
 
+   int _int_log_interval;
+   uint32_t _new_file_interval_s; 
+   int _int_max_files; 
+
+   bool _advancedIsInitialized = false; 
+   
 //TODO aqui podemos hacer un destrozo
-    RegisterEntry _registryBuffer[MAX_MODBUS_REGS];
+    RegisterEntry _registryBuffer[MAX_MODBUS_REGS]; // modbus/rtu
 
     uint16_t _registrySize; // size del numero de registros almacenados en la estructura (Maximo MAX_MODBUS_REGS). 
 
@@ -159,7 +169,8 @@ public:
     //bool modbusRequestByFile(char* filename);
 
     // funcion muy avanzada que hace todo
-    void advancedDatalogger(Struct_MBRequest req, Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
+    bool prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc);
+    void advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
 
 };
 

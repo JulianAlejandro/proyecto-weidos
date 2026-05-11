@@ -19,6 +19,7 @@ class EnergyMeter750 {
   private:
     //ModbusTCPManager* _modbus; // Usamos puntero para flexibilidad
     ModbusTransport* _modbus; 
+    bool _initialized = false; 
 
     uint16_t _internalBuffer[MAX_MODBUS_REGS_REQUEST];
     uint16_t _lastReadSize; 
@@ -30,6 +31,8 @@ class EnergyMeter750 {
     EnergyMeter750();
 
     int begin(ModbusTransport* modbus);
+
+    bool isReady() const {return _initialized;}
 
     uint16_t readData(uint16_t addr); 
 

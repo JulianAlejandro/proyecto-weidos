@@ -4,7 +4,6 @@
 
 ModbusRequestCSV::ModbusRequestCSV(SDManager* sdManager) {
     _sd = sdManager;
-    //_setupFile = SETUP_FILE;
 }
 
 bool ModbusRequestCSV::begin(){
@@ -14,6 +13,7 @@ bool ModbusRequestCSV::begin(){
        // Serial.println("Modbus Request: SDManager no está listo aún.");
         return false;
     }
+    _initialized = true;
     return true;
 
    /*
@@ -25,6 +25,8 @@ bool ModbusRequestCSV::begin(){
 }
 
 bool ModbusRequestCSV::loadFromSDParameters() {
+
+    if(!_initialized) return false; 
     // 1. Usamos false en has_header para que la primera línea TAMBIÉN cuente como fila.
     // Usamos "sssss" porque tu CSV tiene 5 columnas (4 separadores ';')
     CSV_Parser cp("sssss", false, ';');
@@ -89,8 +91,12 @@ bool ModbusRequestCSV::loadFromSDParameters() {
 
 
 Struct_MBRequest ModbusRequestCSV::loadFromSDMbrequest() {
+    
+
     Struct_MBRequest request = {0, 0, 0, 0, 0}; // Inicializamos a cero
     
+    if(!_initialized) return request; 
+
     // Usamos "sssss" para leer strings y luego convertirlos
     CSV_Parser cp("sssss", false, ';');
 

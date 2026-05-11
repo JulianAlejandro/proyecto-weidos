@@ -23,6 +23,7 @@ class ModbusRequestCSV { // TODO Esta clase tendra que cambiar de nombre a algo 
 
 private:
   SDManager* _sd = nullptr;
+  bool _initialized = false;
 
   char _device_name[MAX_TITLES_SIZE];
   char _ip_address[MAX_TITLES_SIZE];

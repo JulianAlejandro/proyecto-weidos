@@ -1,12 +1,10 @@
-
-// TODO , si se supera el maximo de log, borrar el mas antiguo
 #ifndef DATALOGGER_H
 #define DATALOGGER_H
 
 #include <Arduino.h>
 #include "SDManager.h"
 
-#define MAX_LOG_FILES 50
+#define MAX_LOG_FILES 30
 #define FILE_NAME_SIZE 32 // Formato 8.3 (ej: LOG_0001.TXT)
 #define DIR_LOG_NAME "/LOGS"
 

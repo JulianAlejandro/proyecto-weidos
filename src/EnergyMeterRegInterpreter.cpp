@@ -22,7 +22,8 @@ struct StreamContext {
 
 //prototipos funciones auxiliares
 void lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
-void crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos); 
+bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos); 
+uint32_t getLogIntervalFromString(const char* log_interval_str); 
 
 // Constructor: Inicializamos el puntero al manager de la SD
 EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager) 
@@ -41,6 +42,7 @@ int EnergyMeterRegInterpreter::begin(){
         Serial.println("Datalogger: SDManager no está listo aún.");
         return false;
     }
+    _initialized = true; 
     return true;
 
    /*
@@ -155,6 +157,10 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
     _current_request.size = 0;
     _registrySize = 0;
 
+    if(!_initialized){
+        Serial.println("no se inicializo energyMeter");
+        return _current_request;
+    }
     StreamContext ctx = {this, start_addr, size};
         
     // Usamos withFile para obtener el Stream del archivo
@@ -209,6 +215,8 @@ bufRawDataReg EnergyMeterRegInterpreter::getBufferDataRaw(const uint16_t* data_r
     res.buffer = _RawDataBuffer; // Apuntamos al array persistente de la clase
     res.size = 0;
 
+    if(!_initialized) return res;
+
     uint16_t offsetOriginal = 0; // Para rastrear la posición en el array 'datos' raw
 
     // Recorremos las filas que encontramos previamente en la SD
@@ -262,6 +270,8 @@ nameColValues EnergyMeterRegInterpreter::getLastNameValues() { // aqui tiene mas
     // Inicializamos el tamaño a 0 por seguridad
     res.size = 0;
 
+    //if(!_initialized) return false;
+
     for (int i = 0; i < _registrySize; i++) {
         // Filtramos: solo si el booleano es true
         if (_registryBuffer[i].logEnabled == true) {
@@ -278,23 +288,6 @@ nameColValues EnergyMeterRegInterpreter::getLastNameValues() { // aqui tiene mas
     return res;
 }
 
-/*
-nameColValues EnergyMeterRegInterpreter::getLastNameValues() {
-    nameColValues res;
-    
-    // Solo devolvemos los títulos que pertenecen a la última request procesada
-    // Si necesitas filtrar por start_addr aquí, puedes hacerlo, 
-    // pero lo normal es que devuelvas lo que ya tienes en el buffer.
-    
-    for (int i = 0; i < _registrySize; i++) {
-        res.buffer[i] = _bufNamesValues[i];
-    }
-    
-    res.size = _registrySize;
-    return res;
-}
-
-*/
 
 /**
  * Función auxiliar para saber cuántos registros Modbus ocupa cada formato
@@ -338,8 +331,6 @@ coded_format EnergyMeterRegInterpreter::stringToFormat(const char* str) {
     
     return FORMAT_UNKNOWN;
 }
-
-
 
 // modificada
 netDataString EnergyMeterRegInterpreter::getBufNetDataString() {
@@ -430,48 +421,77 @@ Parameters EnergyMeterRegInterpreter::getParameters(){
 }
 
 
+bool EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc) {
 
-void EnergyMeterRegInterpreter::advancedDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc){
-   
-   // se actualiza el buffer de _registryBuffer
-    EM_request EM_req = startNewRequest(MB_req.start_addres, MB_req.length); // se actualizan todos los buffer de EMMR
-    //MB_req.channel;
-    //MB_req.func_code; // ESTO VA CON EL ENERGY METER
+    _advancedIsInitialized = false;
 
-    nameColValues misTitulos = getLastNameValues(); // esto es mas facil
+    //filter
+    if (MB_req.channel <= 0) return false;
+    if (MB_req.start_addres >= MAX_EM_ADDR) return false;
+    if (MB_req.length == 0 || MB_req.length > MAX_MODBUS_REGS_REQUEST) return false;
+    if ((MB_req.start_addres + MB_req.length) > MAX_EM_ADDR) return false;
+    if (MB_req.func_code < 1 || MB_req.func_code > 4) return false;
+    if (MB_req.req_interval_ms < 1000) return false;
 
-
+    startNewRequest(MB_req.start_addres, MB_req.length);
+    if(_current_request.size == 0)return false;
+    
+    _misTitulos = getLastNameValues();
+    if(_misTitulos.size == 0)return false;
+    
     loadParametersMapRegister(); 
-    Parameters param = getParameters(); // esto es mas facil
+    Parameters param = getParameters();
 
-    int log_interval = atoi(param.log_interval);
+    _int_log_interval = atoi(param.log_interval);
+    _new_file_interval_s = getLogIntervalFromString(param.new_file);
+    _int_max_files = atoi(param.max_files);
 
-    crear_nueva_sesion_log(datalogger, rtc, &misTitulos);
+    // 1. _int_log_interval debe ser igual a MB_req.req_interval_ms
+    if (_int_log_interval != MB_req.req_interval_ms) return false;
+    // 2. _new_file_interval_s debe ser igual a 3600 (1 hora)
+    if (_new_file_interval_s != 3600) return false;
+    // 3. _int_max_files debe ser > 0 y < 50
+    if (_int_max_files <= 0 || _int_max_files >= 50) return false;
+    
+    datalogger->clearAllLogs(); // borrar en la version final  
+    if(!crear_nueva_sesion_log(datalogger, rtc, &_misTitulos)) {
+        Serial.println(F("Error: No se pudo crear una nueva sesión de log"));
+        return false; 
+    }
+     
+    anteriorMillisModbus = 0;
+    anteriorMillisArchivo = 0;
 
-    unsigned long anteriorMillisModbus = 0;
-    unsigned long anteriorMillisArchivo = 0;
+    _advancedIsInitialized = true;
+    return _advancedIsInitialized; 
+}
 
-    while(true) {
- 
-         unsigned long actualMillis = millis();
+
+void EnergyMeterRegInterpreter::advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc){
+   
+    if (_advancedIsInitialized){
+       
+        unsigned long actualMillis = millis();
 
         // ---  ---
-        if (actualMillis - anteriorMillisModbus >= log_interval) { // modificar 
+        if (actualMillis - anteriorMillisModbus >= _int_log_interval) {  
             anteriorMillisModbus = actualMillis;
-            lectura_modbus(datalogger, rtc, em, EM_req);       
+            lectura_modbus(datalogger, rtc, em, _current_request);       
         }
 
         // --- Bucle de nueva sesión de log ---
-        if (actualMillis - anteriorMillisArchivo >= (60 * 1000UL)) { // preguntar a xavi como va 
+        if (actualMillis - anteriorMillisArchivo >= (_new_file_interval_s * 1000UL)) { //
             anteriorMillisArchivo = actualMillis;
 
-            datalogger->clearAllLogs();
-            crear_nueva_sesion_log(datalogger, rtc, &misTitulos);
+            //datalogger->clearAllLogs();
+            crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
         }    
+        
+    }else{
+        Serial.println("No se inicializo");
+        delay(5000); 
     }
-
 }
-
 
 void EnergyMeterRegInterpreter::getNetDataString(char* dest, rawDataReg rawRegister){
     coded_format fmt = rawRegister.format;
@@ -536,26 +556,27 @@ void EnergyMeterRegInterpreter::getNetDataString(char* dest, rawDataReg rawRegis
 
 //---------funciones auxiliares------------------
 
-void crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos){
+bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos){
     DateTime ahora = rtc->now();
     char nombreFichero[25]; 
 
    // sprintf(nombreFichero, "%02d%02d%02d%02d%02d%02d.txt", 
     
-    sprintf(nombreFichero, "%02d%02d%02d.txt", 
-            //ahora.year() % 100, // Usamos % 100 para obtener solo "26" de "2026"
-            //ahora.month(), 
-            //ahora.day(), 
-            ahora.hour(), 
-            ahora.minute(), 
-            ahora.second());
+    sprintf(nombreFichero, "%02d%02d%02d%02d.txt", 
+            ahora.year() % 100, // Usamos % 100 para obtener solo "26" de "2026"
+            ahora.month(), 
+            ahora.day(), 
+            ahora.hour()); 
+            //ahora.minute(), 
+            //ahora.second());
     
     Serial.print("Cambiando a nueva sesion: ");
     Serial.println(nombreFichero);
        
     if(!datalogger->newSesion(nombreFichero, misTitulos->buffer, misTitulos->size)){
-        Serial.println("Error al crear el archivo por timestamp");
+        return false; 
     }
+    return true; 
 }
 
 
@@ -589,4 +610,25 @@ void EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_DS323
 
     datalogger->printLogToSerial();
   }
+}
+
+
+uint32_t getLogIntervalFromString(const char* log_interval_str) {
+    if (log_interval_str == nullptr) return 0;
+
+    if (strcasecmp(log_interval_str, "minute") == 0) {
+        return 60UL;
+    } 
+    else if (strcasecmp(log_interval_str, "hour") == 0) {
+        return 3600UL;
+    } 
+    else if (strcasecmp(log_interval_str, "day") == 0) {
+        return 86400UL;
+    } 
+    else if (strcasecmp(log_interval_str, "month") == 0) {
+        // Usamos un mes promedio de 30 días
+        return 2592000UL; 
+    }
+
+    return 0; // Valor por defecto si no coincide nada
 }

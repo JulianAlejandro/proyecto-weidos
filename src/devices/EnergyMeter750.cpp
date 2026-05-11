@@ -4,13 +4,18 @@ EnergyMeter750::EnergyMeter750() {
 }
 
 int EnergyMeter750::begin(ModbusTransport* modbus) {
-    if(modbus == nullptr) return false; 
+    if(modbus == nullptr){
+        return false;
+    }
     _modbus = modbus;
-   // modbus->begin(mac, ip); // aqui faltan estos elementos.....ya van inicializados de fuera?? o como
+    
+    _initialized = true;
     return true;
 }
 
 bool EnergyMeter750::executeRequest(EM_request req) {
+    if(!_initialized) return false; 
+
     _lastReadSize = 0; // Reset preventivo
 
     // 1. Validar que el tamaño sea coherente
@@ -31,10 +36,6 @@ bool EnergyMeter750::executeRequest(EM_request req) {
     if(_modbus->readHoldingRegisters(req.start_addr, req.size)){
         int i = 0;
         for (i = 0; i < req.size; i++) { //TODO: esto se puede mejorar tal y como esta abajo...
-        //Serial.print("Registro ");
-        //Serial.print(19000 + i);
-        //Serial.print(": ");
-        //Serial.println(modbus.getAvailableData());
         _internalBuffer[i] = _modbus->read(); 
         }
         _lastReadSize = i; 
@@ -60,6 +61,8 @@ rawDataBuffer EnergyMeter750::readDataBuffer(){
 }
 
 uint16_t EnergyMeter750::readRegByAdress(uint16_t addr){
+    if(!_initialized) return 0; 
+
     _modbus->readHoldingRegisters(addr, 1);
     //_modbus->requestFrom(_slaveAddress, INPUT_REGISTERS, addr, 1);
     return  _modbus->read();
