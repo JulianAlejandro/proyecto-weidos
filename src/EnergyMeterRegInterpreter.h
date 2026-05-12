@@ -113,9 +113,11 @@ private:
     SDManager* _sd = nullptr; 
     EM_request _current_request; 
     bool _initialized = false; 
+
+    int ultimaUnidadTiempo;
    
     unsigned long anteriorMillisModbus = 0; 
-    unsigned long anteriorMillisArchivo = 0; 
+    //unsigned long anteriorMillisArchivo = 0; 
     nameColValues _misTitulos;
 
     int _int_log_interval;

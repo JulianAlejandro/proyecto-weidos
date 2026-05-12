@@ -4,9 +4,10 @@
 #include <Arduino.h>
 #include "SDManager.h"
 
-#define MAX_LOG_FILES 30
+#define MAX_LOG_CAPACITY 150
 #define FILE_NAME_SIZE 32 // Supports full path (e.g., /LOGS/YYMMDDHH.txt)
 #define DIR_LOG_NAME "/LOGS"
+//formato que recibe de nombre en el _currentLogFile
 
 /**
  * @class Datalogger
@@ -14,8 +15,10 @@
  */
 class Datalogger {
 private:
-    char _filenames[MAX_LOG_FILES][FILE_NAME_SIZE]; // Array to store existing log paths
-    uint16_t _fileCount;                            // Current number of logged files
+    char _filenames[MAX_LOG_CAPACITY][FILE_NAME_SIZE]; // Array to store existing log paths
+    uint16_t _fileCount;  
+    uint16_t _userMaxFiles; //Client limit
+                              // Current number of logged files
     char _currentLogFile[FILE_NAME_SIZE];           // Path of the currently active log
     SDManager* _sd;                                 // Pointer to the SD hardware manager
 
@@ -35,7 +38,7 @@ public:
      * @brief Constructor.
      * @param sdManager Pointer to an initialized SDManager instance.
      */
-    Datalogger(SDManager* sdManager);
+    Datalogger(SDManager* sdManager, uint16_t maxFiles);
 
     /**
      * @brief Initializes the logging directory and scans existing files.
@@ -93,6 +96,8 @@ public:
      * @brief Physically deletes all log files within the /LOGS directory.
      */
     void clearAllLogs();
+
+    void setMaxFiles(uint16_t maxFiles);
 };
 
 #endif

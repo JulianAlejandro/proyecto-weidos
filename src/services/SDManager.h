@@ -85,6 +85,8 @@ public:
      * @return true if file was opened successfully.
      */
     bool withFile(const char* path, StreamCallback callback, void* context);
+
+    bool withFileWrite(const char* path, StreamCallback callback, void* context);
 };
 
 #endif

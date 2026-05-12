@@ -1,11 +1,27 @@
 #include "Datalogger.h"
-
+struct RowData {
+    const char* timestamp;
+    const char** values;
+    uint16_t numValues;
+};
+void writeRowCallback(Stream& stream, void* context);
 /**
  * @brief Initialize members and clear internal buffers.
  */
-Datalogger::Datalogger(SDManager* sdManager) : _sd(sdManager), _fileCount(0) {
+Datalogger::Datalogger(SDManager* sdManager, uint16_t maxFiles) : _sd(sdManager), _fileCount(0) {
+    setMaxFiles(maxFiles);
     memset(_filenames, 0, sizeof(_filenames));
     _currentLogFile[0] = '\0';
+}
+
+void Datalogger::setMaxFiles(uint16_t maxFiles) {
+    if (maxFiles > MAX_LOG_CAPACITY) {
+        _userMaxFiles = MAX_LOG_CAPACITY;
+    } else if (maxFiles == 0) {
+        _userMaxFiles = 1; // Evitamos división por cero o errores lógicos
+    } else {
+        _userMaxFiles = maxFiles;
+    }
 }
 
 /**
@@ -40,9 +56,8 @@ void Datalogger::scanExistingLogs() {
 
         if (!entry.isDirectory()) {
             const char* name = entry.name();
-            
-            if (hasLogExtension(name) && _fileCount < MAX_LOG_FILES) {
-                // Store full path for direct SD access
+            // Solo guardamos hasta el límite definido por el usuario
+            if (hasLogExtension(name) && _fileCount < _userMaxFiles) {
                 snprintf(_filenames[_fileCount], FILE_NAME_SIZE, "%s/%s", DIR_LOG_NAME, name);
                 _fileCount++;
             }
@@ -79,7 +94,7 @@ bool Datalogger::newLog(const char* name) {
  */
 bool Datalogger::addAndSetLogFile(const char* filename) {
     // 1. Manage Circular Buffer: Delete oldest if full
-    if (_fileCount >= MAX_LOG_FILES) {
+    if (_fileCount >= _userMaxFiles) {
         int oldestIndex = 0;
         
         // Find the "smallest" string (Format YYMMDDHH works perfectly here)
@@ -96,7 +111,7 @@ bool Datalogger::addAndSetLogFile(const char* filename) {
             }
             _fileCount--; 
         } else {
-            return false; // SD Error or file locked
+            return false; 
         }
     }
 
@@ -168,6 +183,32 @@ bool Datalogger::writeHeader(const char** titulos, uint16_t numTitulos) {
 /**
  * @brief Appends a data row. Converts timestamp and value array into a semicolon-separated line.
  */
+ bool Datalogger::writeRow(const char* timestamp, const char** values, uint16_t numValues) {
+    RowData data = { timestamp, values, numValues };
+    
+    // Llamamos a withFile pasando la estructura de datos
+    return _sd->withFileWrite(_currentLogFile, writeRowCallback, &data);
+}
+
+/**
+ * @brief Appends a data row. Converts timestamp and value array into a semicolon-separated line.
+ */
+void writeRowCallback(Stream& stream, void* context) {
+    // El 'context' es un puntero a una estructura con nuestros datos
+    RowData* data = (RowData*)context;
+    File* file = (File*)&stream; // Cast a File para usar funciones de archivo
+
+    file->print(data->timestamp);
+    for (uint16_t i = 0; i < data->numValues; i++) {
+        file->print(";");
+        if (data->values[i] != nullptr) {
+            file->print(data->values[i]);
+        }
+    }
+    file->println(); // Final de línea
+}
+
+ /*
 bool Datalogger::writeRow(const char* timestamp, const char** values, uint16_t numValues) {
     if (numValues == 0 || _currentLogFile[0] == '\0') return false;
 
@@ -183,6 +224,7 @@ bool Datalogger::writeRow(const char* timestamp, const char** values, uint16_t n
 
     return _sd->appendLine(_currentLogFile, buffer);
 }
+*/
 
 /**
  * @brief Resets the current file to empty state.

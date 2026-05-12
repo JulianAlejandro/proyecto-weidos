@@ -92,6 +92,7 @@ void EnergyMeterRegInterpreter::processParserData(CSV_Parser& cp, uint16_t start
         }
     }
     
+    
     //Serial.print(F("Process finished. Rows in range: "));
     //Serial.println(_registrySize);
 }
@@ -100,7 +101,7 @@ void EnergyMeterRegInterpreter::processParserData(CSV_Parser& cp, uint16_t start
  * @brief Initializes a new request by parsing the register map from SD.
  */
 EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
-    _current_request.start_addr = start_addr;
+    _current_request.start_addr = 0;
     _current_request.size = 0;
     _registrySize = 0;
 
@@ -135,7 +136,7 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
         sc->instance->processParserData(cp, sc->start_addr, sc->size);
 
     }, &ctx);
-        
+    _current_request.start_addr = _registryBuffer[0].address; 
     return _current_request;
 }
 
@@ -322,15 +323,45 @@ bool EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req
 
     _advancedIsInitialized = false;
 
+    
     // Validation filters
-    if (MB_req.channel <= 0) return false;
-    if (MB_req.start_addres >= MAX_EM_ADDR) return false;
-    if (MB_req.length == 0 || MB_req.length > MAX_MODBUS_REGS_REQUEST) return false;
-    if ((MB_req.start_addres + MB_req.length) > MAX_EM_ADDR) return false;
-    if (MB_req.func_code < 1 || MB_req.func_code > 4) return false;
-    if (MB_req.req_interval_ms < 1000) return false;
+    //if (MB_req.channel <= 0) return false;
+    //if (MB_req.start_addres >= MAX_EM_ADDR) return false;
+    //if (MB_req.length == 0 || MB_req.length > MAX_MODBUS_REGS_REQUEST) return false;
+    //if ((MB_req.start_addres + MB_req.length) > MAX_EM_ADDR) return false;
+    //if (MB_req.func_code < 1 || MB_req.func_code > 4) return false;
+    //if (MB_req.req_interval_ms < 1000) return false;
+    
 
     startNewRequest(MB_req.start_addres, MB_req.length);
+
+/*
+    Serial.print("tamaño: "); 
+    Serial.println(_registrySize); 
+
+    for(int i = 0; i < _registrySize; i++){
+        Serial.print("direcciones:"); 
+        Serial.println(_registryBuffer[i].address); 
+
+        Serial.print("formato:"); 
+        Serial.println(_registryBuffer[i].format); 
+
+        Serial.print("log:"); 
+        Serial.println(_registryBuffer[i].logEnabled); 
+
+        Serial.print("nombre:"); 
+        Serial.println(_registryBuffer[i].name); 
+
+    }
+ Serial.println(); 
+
+    Serial.print("start");
+    Serial.println(_current_request.start_addr);
+    Serial.print("tamaño request");
+    Serial.println(_current_request.size);
+*/
+ 
+
     if(_current_request.size == 0) return false;
     
     _misTitulos = getLastNameValues();
@@ -343,51 +374,93 @@ bool EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req
     _new_file_interval_s = getLogIntervalFromString(param.new_file);
     _int_max_files = atoi(param.max_files);
 
+    
     // Business Logic Constraints
-    if (_int_log_interval != (int)MB_req.req_interval_ms) return false;
-    if (_new_file_interval_s != 3600) return false; // Hardcoded to 1 hour for now
-    if (_int_max_files <= 0 || _int_max_files >= 50) return false;
-    
+    //if (_int_log_interval != (int)MB_req.req_interval_ms) return false;
+    //if (_new_file_interval_s != 3600) return false; // Hardcoded to 1 hour for now
+    //if (_int_max_files <= 0 || _int_max_files >= 50) return false;
+   
+   //if (_int_log_interval != (int)MB_req.req_interval_ms) return false;
+   //if (_new_file_interval_s <= _int_log_interval) return false; // Hardcoded to 1 hour for now
+   //if (_int_max_files <= 0 || _int_max_files >= 50) return false;
+
+    datalogger->setMaxFiles(_int_max_files);
+
     datalogger->clearAllLogs(); // Optional: clears folder on every reboot
-    
+    /*
     if(!crear_nueva_sesion_log(datalogger, rtc, &_misTitulos)) {
         //Serial.println(F("Error: Failed to create log session."));
         return false; 
     }
-     
+     */
+
     anteriorMillisModbus = 0;
-    anteriorMillisArchivo = 0;
+    //anteriorMillisArchivo = 0;
 
     _advancedIsInitialized = true;
     return true; 
 }
 
+
 /**
  * @brief Main execution loop for timed logging and file rotation.
  */
+ void EnergyMeterRegInterpreter::advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc) {
+    if (!_advancedIsInitialized) return;
+
+    unsigned long actualMillis = millis();
+    DateTime ahora = rtc->now();
+
+    // --- CAMBIO DE SESIÓN (Basado en RTC) ---
+    bool debeCambiarSesion = false;
+
+    // Comparamos el tiempo actual con la última vez que se cambió de archivo
+    if (ahora.minute() != ultimaUnidadTiempo) { 
+        // Ejemplo para cambio cada MINUTO
+        if (strcasecmp(_new_file, "minute") == 0) debeCambiarSesion = true;
+        
+        // Ejemplo para cambio cada HORA (si el minuto es 0 y cambió la hora)
+        if (strcasecmp(_new_file, "hour") == 0 && ahora.minute() == 0) debeCambiarSesion = true;
+        
+        // Ejemplo para cambio cada DÍA (si es medianoche)
+        if (strcasecmp(_new_file, "day") == 0 && ahora.hour() == 0 && ahora.minute() == 0) debeCambiarSesion = true;
+
+        if (debeCambiarSesion) {
+            ultimaUnidadTiempo = ahora.minute(); // Actualizamos bandera
+            crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
+        }
+    }
+
+    // --- MUESTREO (Basado en millis) ---
+    if (actualMillis - anteriorMillisModbus >= (unsigned long)_int_log_interval) {
+        anteriorMillisModbus += _int_log_interval;
+        lectura_modbus(datalogger, rtc, em, _current_request);
+    }
+}
+ /*
 void EnergyMeterRegInterpreter::advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc){
    
     if (_advancedIsInitialized){
         unsigned long actualMillis = millis();
 
-        // Timer for Modbus sampling
-        if (actualMillis - anteriorMillisModbus >= (unsigned long)_int_log_interval) {  
-            anteriorMillisModbus = actualMillis;
-            lectura_modbus(datalogger, rtc, em, _current_request);       
-        }
-
         // Timer for file rotation (new log session)
         if (actualMillis - anteriorMillisArchivo >= (_new_file_interval_s * 1000UL)) { 
             anteriorMillisArchivo = actualMillis;
             crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
-        }        
+        }  
+        
+        // Timer for Modbus sampling
+        if (actualMillis - anteriorMillisModbus >= (unsigned long)_int_log_interval) {  
+            anteriorMillisModbus = actualMillis;
+            lectura_modbus(datalogger, rtc, em, _current_request);       
+        }      
         
     } else {
         //Serial.println(F("System not initialized. Waiting..."));
         //delay(5000); 
     }
 }
-
+*/
 /**
  * @brief Converts binary raw registers to human-readable strings based on format.
  */
@@ -450,16 +523,14 @@ bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValu
     DateTime ahora = rtc->now();
     char nombreFichero[25]; 
 
-    // Format: YYMMDDHH.txt
+    // Formato: YYMMDDHHmm.txt (Año, Mes, Día, Hora, Minuto)
     sprintf(nombreFichero, "%02d%02d%02d%02d.txt", 
-            ahora.year() % 100, 
+            //ahora.year() % 100, 
             ahora.month(), 
             ahora.day(), 
-            ahora.hour()); 
+            ahora.hour(),
+            ahora.minute()); // <--- Añadido minuto
     
-    //Serial.print(F("Rotating to new session: "));
-    //Serial.println(nombreFichero);
-       
     return datalogger->newSesion(nombreFichero, misTitulos->buffer, misTitulos->size);
 }
 

@@ -20,7 +20,7 @@
 // Global Instances
 RTC_DS3231 rtc;
 SDManager sd;  
-Datalogger datalogger(&sd); 
+Datalogger datalogger(&sd,30); //30 ficheros por defecto
 EnergyMeterRegInterpreter regInterpreter(&sd); 
 EnergyMeter750 energy_meter; 
 ModbusRequestCSV mb_csv(&sd);
@@ -56,6 +56,7 @@ void setup() {
   // NOTE: Manual RTC sync. In production, this should be synced with an NTP server 
   // or only set if the RTC lost power.
   rtc.adjust(DateTime(2026, 5, 11, 15, 26, 0)); 
+  delay(1000); 
 
   // 5. Load Modbus Requests and Device Parameters from CSV on SD
   if(!mb_csv.begin()){
@@ -108,7 +109,7 @@ void setup() {
   // This validates the CSV request against the meter's memory map and starts the SD log file
   if(!regInterpreter.prepareAdvanceDatalogger(req, &datalogger, &rtc)){
     Serial.println(F("Error: Advanced Datalogger initialization failed. Check request ranges."));
-  } 
+  }
 }
 
 void loop() {

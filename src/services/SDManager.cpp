@@ -116,3 +116,17 @@ bool SDManager::withFile(const char* path, StreamCallback callback, void* contex
     file.close();
     return true;
 }
+
+
+// Versión modificada de withFile para permitir escritura
+bool SDManager::withFileWrite(const char* path, StreamCallback callback, void* context) {
+    if (!_initialized) return false;
+
+    File file = SD.open(path, FILE_WRITE); // Ahora usa el modo pasado por parámetro
+    if (!file) return false;
+
+    callback(file, context);
+    
+    file.close();
+    return true;
+}
