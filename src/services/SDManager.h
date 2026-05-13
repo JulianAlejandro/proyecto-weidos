@@ -68,7 +68,7 @@ public:
      * @param data String data to append.
      * @return true if successfully written.
      */
-    bool appendLine(const char* path, const char* data);
+    //bool appendLine(const char* path, const char* data);
 
     /**
      * @brief Reads the entire content of a file and prints it to the Serial monitor.
@@ -87,6 +87,8 @@ public:
     bool withFile(const char* path, StreamCallback callback, void* context);
 
     bool withFileWrite(const char* path, StreamCallback callback, void* context);
+
+    bool deleteFile(const char* path);
 };
 
 #endif

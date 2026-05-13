@@ -55,8 +55,8 @@ void setup() {
 
   // NOTE: Manual RTC sync. In production, this should be synced with an NTP server 
   // or only set if the RTC lost power.
-  rtc.adjust(DateTime(2026, 5, 11, 15, 26, 0)); 
-  delay(1000); 
+  rtc.adjust(DateTime(2026, 5, 13, 11, 47, 3)); 
+  delay(1000);
 
   // 5. Load Modbus Requests and Device Parameters from CSV on SD
   if(!mb_csv.begin()){

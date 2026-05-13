@@ -325,14 +325,13 @@ bool EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req
 
     
     // Validation filters
-    //if (MB_req.channel <= 0) return false;
-    //if (MB_req.start_addres >= MAX_EM_ADDR) return false;
-    //if (MB_req.length == 0 || MB_req.length > MAX_MODBUS_REGS_REQUEST) return false;
-    //if ((MB_req.start_addres + MB_req.length) > MAX_EM_ADDR) return false;
-    //if (MB_req.func_code < 1 || MB_req.func_code > 4) return false;
-    //if (MB_req.req_interval_ms < 1000) return false;
+    if (MB_req.channel <= 0) return false;
+    if (MB_req.start_addres >= MAX_EM_ADDR) return false;
+    if (MB_req.length == 0 || MB_req.length > MAX_MODBUS_REGS_REQUEST) return false;
+    if ((MB_req.start_addres + MB_req.length) > MAX_EM_ADDR) return false;
+    if (MB_req.func_code < 1 || MB_req.func_code > 4) return false;
+    if (MB_req.req_interval_ms < 1000) return false;
     
-
     startNewRequest(MB_req.start_addres, MB_req.length);
 
 /*
@@ -378,15 +377,16 @@ bool EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req
     // Business Logic Constraints
     //if (_int_log_interval != (int)MB_req.req_interval_ms) return false;
     //if (_new_file_interval_s != 3600) return false; // Hardcoded to 1 hour for now
-    //if (_int_max_files <= 0 || _int_max_files >= 50) return false;
+    if (_int_max_files <= 0 || _int_max_files >= MAX_LOG_CAPACITY) return false;
    
    //if (_int_log_interval != (int)MB_req.req_interval_ms) return false;
    //if (_new_file_interval_s <= _int_log_interval) return false; // Hardcoded to 1 hour for now
    //if (_int_max_files <= 0 || _int_max_files >= 50) return false;
 
+
     datalogger->setMaxFiles(_int_max_files);
 
-    datalogger->clearAllLogs(); // Optional: clears folder on every reboot
+    //datalogger->clearAllLogs(); // Optional: clears folder on every reboot
     /*
     if(!crear_nueva_sesion_log(datalogger, rtc, &_misTitulos)) {
         //Serial.println(F("Error: Failed to create log session."));
@@ -524,7 +524,7 @@ bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValu
     char nombreFichero[25]; 
 
     // Formato: YYMMDDHHmm.txt (Año, Mes, Día, Hora, Minuto)
-    sprintf(nombreFichero, "%02d%02d%02d%02d.txt", 
+    sprintf(nombreFichero, "%02d%02d%02d%02d", 
             //ahora.year() % 100, 
             ahora.month(), 
             ahora.day(), 

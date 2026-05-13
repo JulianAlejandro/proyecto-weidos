@@ -4,6 +4,12 @@ struct RowData {
     const char** values;
     uint16_t numValues;
 };
+struct HeaderData {
+    const char** titles;
+    uint16_t numTitles;
+};
+
+void writeHeaderCallback(Stream& stream, void* context);
 void writeRowCallback(Stream& stream, void* context);
 /**
  * @brief Initialize members and clear internal buffers.
@@ -44,6 +50,7 @@ bool Datalogger::begin() {
  * @brief Scans the directory to track existing logs. 
  * Enables the "Delete Oldest" feature by knowing what is already on the card.
  */
+ //TODO
 void Datalogger::scanExistingLogs() {
     File root = SD.open(DIR_LOG_NAME); 
     if (!root || !root.isDirectory()) return;
@@ -75,7 +82,10 @@ bool Datalogger::hasLogExtension(const char* filename) {
     if (len < 4) return false;
     
     const char* ext = filename + len - 4;
-    return (strcasecmp(ext, ".log") == 0 || strcasecmp(ext, ".txt") == 0);
+    // Añadimos la comparación con .csv
+    return (//strcasecmp(ext, ".log") == 0 || 
+            //strcasecmp(ext, ".txt") == 0 || 
+            strcasecmp(ext, ".csv") == 0); // <--- Nueva extensión
 }
 
 /**
@@ -83,7 +93,14 @@ bool Datalogger::hasLogExtension(const char* filename) {
  */
 bool Datalogger::newLog(const char* name) {
     char fullPath[FILE_NAME_SIZE];
-    snprintf(fullPath, sizeof(fullPath), "%s/%s", DIR_LOG_NAME, name);
+    
+    // Verificamos si el nombre ya trae .csv, si no, se lo ponemos
+    if (strstr(name, ".csv") == nullptr) {
+        snprintf(fullPath, sizeof(fullPath), "%s/%s.csv", DIR_LOG_NAME, name);
+    } else {
+        snprintf(fullPath, sizeof(fullPath), "%s/%s", DIR_LOG_NAME, name);
+    }
+    
     return addAndSetLogFile(fullPath);
 }
 
@@ -164,20 +181,35 @@ void Datalogger::selectLogByIndex(uint16_t index) {
 /**
  * @brief Writes CSV header columns separated by semicolons.
  */
-bool Datalogger::writeHeader(const char** titulos, uint16_t numTitulos) {
-    if (numTitulos == 0 || strlen(_currentLogFile) == 0) return false;
-
-    char buffer[256]; 
-    buffer[0] = '\0'; 
-
-    for (uint16_t i = 0; i < numTitulos; i++) {
-        strncat(buffer, titulos[i], sizeof(buffer) - strlen(buffer) - 1);
-        if (i < numTitulos - 1) {
-            strncat(buffer, ";", sizeof(buffer) - strlen(buffer) - 1);
-        }
+/**
+ * @brief Writes CSV header columns using the file stream callback.
+ */
+bool Datalogger::writeHeader(const char** titles, uint16_t numTitles) {
+    if (numTitles == 0 || _currentLogFile[0] == '\0') {
+        return false;
     }
 
-    return _sd->appendLine(_currentLogFile, buffer);
+    HeaderData data = { titles, numTitles };
+    
+    // Ejecutamos la escritura a través del SDManager usando el callback
+    return _sd->withFileWrite(_currentLogFile, writeHeaderCallback, &data);
+}
+
+void writeHeaderCallback(Stream& stream, void* context) {
+    HeaderData* data = (HeaderData*)context;
+    File* file = (File*)&stream;
+
+    for (uint16_t i = 0; i < data->numTitles; i++) {
+        if (data->titles[i] != nullptr) {
+            file->print(data->titles[i]);
+        }
+        
+        // Imprimir punto y coma excepto en el último elemento
+        if (i < data->numTitles - 1) {
+            file->print(";");
+        }
+    }
+    file->println(); // Salto de línea al final del encabezado
 }
 
 /**
@@ -271,6 +303,7 @@ bool Datalogger::newSesion(const char * name, const char** titles, uint16_t numT
 /**
  * @brief Wipes the /LOGS directory and resets internal tracking.
  */
+ //TODO
 void Datalogger::clearAllLogs() {
     File root = SD.open(DIR_LOG_NAME);
     if (!root || !root.isDirectory()) return;

@@ -62,6 +62,7 @@ void SDManager::clearFile(const char* path) {
 /**
  * @brief Opens file in append mode and adds a new line of data.
  */
+/*
 bool SDManager::appendLine(const char* path, const char* data) {
     File f = SD.open(path, FILE_WRITE);
     if (!f) return false;
@@ -70,7 +71,7 @@ bool SDManager::appendLine(const char* path, const char* data) {
     f.close();
     return true;
 }
-
+*/
 /**
  * @brief Utility for debugging. Prints the full file content to Serial.
  */
@@ -98,6 +99,20 @@ bool SDManager::createDirectory(const char* path) {
     }
 
     return SD.mkdir(path);
+}
+
+/**
+ * @brief Deletes a file from the SD card.
+ * @param path Full path to the file.
+ * @return true if the file was successfully deleted or didn't exist, false if deletion failed.
+ */
+bool SDManager::deleteFile(const char* path) {
+    if (!_initialized) return false;
+
+    // Si el archivo no existe, técnicamente la tarea de "eliminarlo" es un éxito
+    if (!SD.exists(path)) return true;
+
+    return SD.remove(path);
 }
 
 /**
