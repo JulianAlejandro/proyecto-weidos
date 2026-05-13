@@ -55,7 +55,7 @@ void setup() {
 
   // NOTE: Manual RTC sync. In production, this should be synced with an NTP server 
   // or only set if the RTC lost power.
-  rtc.adjust(DateTime(2026, 5, 13, 11, 47, 3)); 
+  //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   delay(1000);
 
   // 5. Load Modbus Requests and Device Parameters from CSV on SD
@@ -118,7 +118,7 @@ void loop() {
    * Reads data from Energy Meter, interprets registers, and logs to SD 
    * based on the intervals defined in the configuration.
    */
-  regInterpreter.advancedDataloggerExec(&datalogger, &energy_meter, &rtc); 
+  regInterpreter.advancedDataloggerExec(&datalogger, &energy_meter, &rtc);
 
   // Minor delay to yield to other tasks or background processes
   delay(100); 

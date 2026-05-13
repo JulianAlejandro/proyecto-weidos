@@ -42,7 +42,7 @@ bool Datalogger::begin() {
     scanExistingLogs();
     
     // Ensure the current log pointer is empty until a session starts
-    memset(_currentLogFile, 0, sizeof(_currentLogFile));
+    //memset(_currentLogFile, 0, sizeof(_currentLogFile));
     return true;
 }
 
@@ -51,6 +51,41 @@ bool Datalogger::begin() {
  * Enables the "Delete Oldest" feature by knowing what is already on the card.
  */
  //TODO
+ 
+ void Datalogger::scanExistingLogs() {
+    File root = SD.open(DIR_LOG_NAME); 
+    if (!root || !root.isDirectory()) return;
+
+    _fileCount = 0;
+    int newestIndex = -1;
+
+    while (true) {
+        File entry = root.openNextFile();
+        if (!entry) break;
+
+        if (!entry.isDirectory()) {
+            const char* name = entry.name();
+            if (hasLogExtension(name) && _fileCount < _userMaxFiles) {
+                snprintf(_filenames[_fileCount], FILE_NAME_SIZE, "%s/%s", DIR_LOG_NAME, name);
+                
+                // Si es el primer archivo o es alfabéticamente mayor al que teníamos
+                if (newestIndex == -1 || strcmp(_filenames[_fileCount], _filenames[newestIndex]) > 0) {
+                    newestIndex = _fileCount;
+                }
+                
+                _fileCount++;
+            }
+        }
+        entry.close();
+    }
+    root.close();
+
+    // Ahora seleccionamos el que realmente tiene el nombre con fecha/hora más alta
+    if (newestIndex != -1) {
+        selectLogByIndex(newestIndex); 
+    }
+}
+ /*
 void Datalogger::scanExistingLogs() {
     File root = SD.open(DIR_LOG_NAME); 
     if (!root || !root.isDirectory()) return;
@@ -72,7 +107,13 @@ void Datalogger::scanExistingLogs() {
         entry.close();
     }
     root.close();
+
+    if (_fileCount > 0) {
+        // Usamos la función que ya tienes para seleccionar por índice
+        selectLogByIndex(_fileCount - 1); 
+    }
 }
+*/
 
 /**
  * @brief Checks for valid file extensions (.txt or .log) using case-insensitive comparison.

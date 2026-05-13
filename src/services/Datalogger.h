@@ -97,6 +97,12 @@ public:
      */
     void clearAllLogs();
 
+    /**
+     * @brief Returns the path of the currently active log file.
+     * @return Constant pointer to the filename string.
+    */
+    const char* getCurrentLogFile() const { return _currentLogFile; }
+
     void setMaxFiles(uint16_t maxFiles);
 };
 

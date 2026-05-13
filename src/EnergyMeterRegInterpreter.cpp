@@ -323,7 +323,6 @@ bool EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req
 
     _advancedIsInitialized = false;
 
-    
     // Validation filters
     if (MB_req.channel <= 0) return false;
     if (MB_req.start_addres >= MAX_EM_ADDR) return false;
@@ -334,32 +333,6 @@ bool EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req
     
     startNewRequest(MB_req.start_addres, MB_req.length);
 
-/*
-    Serial.print("tamaño: "); 
-    Serial.println(_registrySize); 
-
-    for(int i = 0; i < _registrySize; i++){
-        Serial.print("direcciones:"); 
-        Serial.println(_registryBuffer[i].address); 
-
-        Serial.print("formato:"); 
-        Serial.println(_registryBuffer[i].format); 
-
-        Serial.print("log:"); 
-        Serial.println(_registryBuffer[i].logEnabled); 
-
-        Serial.print("nombre:"); 
-        Serial.println(_registryBuffer[i].name); 
-
-    }
- Serial.println(); 
-
-    Serial.print("start");
-    Serial.println(_current_request.start_addr);
-    Serial.print("tamaño request");
-    Serial.println(_current_request.size);
-*/
- 
 
     if(_current_request.size == 0) return false;
     
@@ -517,20 +490,36 @@ void EnergyMeterRegInterpreter::getNetDataString(char* dest, rawDataReg rawRegis
 //--------- Helper Functions ------------------
 
 /**
- * @brief Generates a filename based on RTC time (YYMMDDHH.txt) and starts a new SD session.
+ * @brief Genera un nombre de archivo basado en el RTC y crea sesión solo si el nombre cambia.
  */
-bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos){
+bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos) {
     DateTime ahora = rtc->now();
-    char nombreFichero[25]; 
+    char nombreFichero[16]; 
 
-    // Formato: YYMMDDHHmm.txt (Año, Mes, Día, Hora, Minuto)
-    sprintf(nombreFichero, "%02d%02d%02d%02d", 
-            //ahora.year() % 100, 
+    // Formato: MMDDHHmm
+    snprintf(nombreFichero, sizeof(nombreFichero), "%02d%02d%02d%02d", 
             ahora.month(), 
             ahora.day(), 
             ahora.hour(),
-            ahora.minute()); // <--- Añadido minuto
+            ahora.minute());
     
+    const char* actual = datalogger->getCurrentLogFile();
+
+    // --- DEBUG LOGS ---
+    Serial.println(F("--- Comparación de Sesión ---"));
+    Serial.print(F("Nueva sugerencia (nombreFichero): ")); 
+    Serial.println(nombreFichero);
+    Serial.print(F("Sesión activa (actual): ")); 
+    Serial.println(actual[0] == '\0' ? "[VACÍO]" : actual);
+    // ------------------
+
+    // Verificamos si nombreFichero está contenido en la ruta actual
+    if (actual[0] != '\0' && strstr(actual, nombreFichero) != nullptr) {
+        Serial.println(F(">> COINCIDENCIA DETECTADA: Manteniendo sesión actual.")); 
+        return true; 
+    }
+
+    Serial.println(F(">> NO COINCIDE: Creando nueva sesión...")); 
     return datalogger->newSesion(nombreFichero, misTitulos->buffer, misTitulos->size);
 }
 
