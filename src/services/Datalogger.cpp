@@ -1,4 +1,6 @@
 #include "Datalogger.h"
+#include <esp_err.h>
+
 struct RowData {
     const char* timestamp;
     const char** values;
@@ -34,16 +36,14 @@ void Datalogger::setMaxFiles(uint16_t maxFiles) {
  * @brief Sets up the directory structure and performs an initial scan of the SD card.
  */
 bool Datalogger::begin() {
-    if (!_sd->isReady()) return false;
+    if (!_sd->isReady()) return ESP_ERR_SD_NOT_INIT;
 
-    // Create the base log directory if it doesn't exist
-    if (!_sd->createDirectory(DIR_LOG_NAME)) return false;
+    // Intentar crear/verificar directorio. Propagamos el error si falla.
+    esp_err_t err = _sd->createDirectory(DIR_LOG_NAME);
+    if (err != ESP_OK) return err;
 
     scanExistingLogs();
-    
-    // Ensure the current log pointer is empty until a session starts
-    //memset(_currentLogFile, 0, sizeof(_currentLogFile));
-    return true;
+    return ESP_OK;
 }
 
 /**
@@ -207,7 +207,7 @@ bool Datalogger::addAndSetLogFile(const char* filename) {
     strncpy(_currentLogFile, _filenames[_fileCount], FILE_NAME_SIZE - 1);
     
     _fileCount++;
-    return _sd->createFile(_currentLogFile);
+    return !_sd->createFile(_currentLogFile);
 }
 
 /**
@@ -233,7 +233,7 @@ bool Datalogger::writeHeader(const char** titles, uint16_t numTitles) {
     HeaderData data = { titles, numTitles };
     
     // Ejecutamos la escritura a través del SDManager usando el callback
-    return _sd->withFileWrite(_currentLogFile, writeHeaderCallback, &data);
+    return !_sd->withFileWrite(_currentLogFile, writeHeaderCallback, &data);
 }
 
 void writeHeaderCallback(Stream& stream, void* context) {
@@ -260,7 +260,7 @@ void writeHeaderCallback(Stream& stream, void* context) {
     RowData data = { timestamp, values, numValues };
     
     // Llamamos a withFile pasando la estructura de datos
-    return _sd->withFileWrite(_currentLogFile, writeRowCallback, &data);
+    return !_sd->withFileWrite(_currentLogFile, writeRowCallback, &data);
 }
 
 /**

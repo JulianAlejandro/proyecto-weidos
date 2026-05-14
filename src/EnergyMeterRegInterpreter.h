@@ -5,6 +5,12 @@
 #include <CSV_Parser.h>
 #include "ModbusRequestCSV.h"
 
+// codigos
+#define ESP_ERR_INTERPRETER_BASE      0x60000
+#define ESP_ERR_INTERPRETER_NOT_INIT  (ESP_ERR_INTERPRETER_BASE + 1)
+#define ESP_ERR_INTERPRETER_MAP_MISS  (ESP_ERR_INTERPRETER_BASE + 2) // No hay registros en ese rango
+#define ESP_ERR_INTERPRETER_BAD_CONF  (ESP_ERR_INTERPRETER_BASE + 3) // Configuración de CSV inválida
+
 // Constants for Register Mapping
 #define NUM_COL_REG_EM750 5
 #define MAX_MODBUS_REGS 125    ///< Limit for the number of processable Modbus registers
@@ -143,13 +149,13 @@ private:
 
 public:
     EnergyMeterRegInterpreter(SDManager* sdManager);
-    int begin();
+    esp_err_t begin();
 
     /**
      * @brief Reads the SD map and filters registers based on a requested range.
      * @return An EM_request object with the calculated total size.
      */
-    EM_request startNewRequest(const uint16_t start_addr, const uint16_t size);
+    esp_err_t startNewRequest(const uint16_t start_addr, const uint16_t size, EM_request *out_request);
 
     /**
      * @brief Maps raw 16-bit arrays into the formatted rawDataReg buffer.
@@ -181,7 +187,7 @@ public:
     /**
      * @brief Automates the entire datalogging setup and execution.
      */
-    bool prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc);
+    esp_err_t prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc);
     void advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
 };
 

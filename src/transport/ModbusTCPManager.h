@@ -5,6 +5,9 @@
 #include <ArduinoModbus.h>
 #include "../core/ModbusTransport.h" 
 
+#define ESP_ERR_MODBUS_TCP_IP_NOT_FOUND (ESP_ERR_MODBUS_BASE + 101)
+#define ESP_ERR_MODBUS_TCP_SOCKET       (ESP_ERR_MODBUS_BASE + 102)
+
 /**
  * @class ModbusTCPManager
  * @brief Handles Modbus TCP communications by implementing the ModbusTransport interface.
@@ -23,7 +26,7 @@ class ModbusTCPManager : public ModbusTransport {
      * @brief Internal helper to verify and maintain the TCP connection.
      * @return true if connection is active or successfully restored.
      */
-    bool ensureConnection();
+    esp_err_t ensureConnection();
 
   public:
     /**
@@ -41,14 +44,14 @@ class ModbusTCPManager : public ModbusTransport {
      * @brief Standard initialization from interface.
      * @return true if communication with the server is established.
      */
-    bool begin() override; 
+    esp_err_t begin() override; 
     
     /**
      * @brief Hardware-specific initialization for the Ethernet shield.
      * @param mac Hardware MAC address array.
      * @param localIP Static IP assigned to the device.
      */
-    void begin(byte mac[], IPAddress localIP);
+    esp_err_t begin(byte mac[], IPAddress localIP);
 
     /**
      * @brief Checks the current connection status.
@@ -64,7 +67,7 @@ class ModbusTCPManager : public ModbusTransport {
      * @param nb Number of registers/coils to request.
      * @return true if the request was successfully sent and acknowledged.
      */
-    bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) override;
+    esp_err_t requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) override;
 
     /**
      * @brief Reads the next available value from the response buffer.
@@ -78,7 +81,7 @@ class ModbusTCPManager : public ModbusTransport {
      * @param value Value to write.
      * @return true if write was successful.
      */
-    bool writeHoldingRegister(uint16_t address, uint16_t value) override;
+    esp_err_t writeHoldingRegister(uint16_t address, uint16_t value) override;
 
     /**
      * @brief Writes a single boolean value to a Coil.
@@ -86,7 +89,7 @@ class ModbusTCPManager : public ModbusTransport {
      * @param value Boolean state to write.
      * @return true if write was successful.
      */
-    bool writeCoil(uint16_t address, bool value) override;
+    esp_err_t writeCoil(uint16_t address, bool value) override;
 
     /**
      * @brief Interface specific implementation for reading Holding Registers.
@@ -94,7 +97,7 @@ class ModbusTCPManager : public ModbusTransport {
      * @param quantity Number of registers.
      * @return true if successful.
      */
-    bool readHoldingRegisters(uint16_t address, uint16_t quantity) override;
+    esp_err_t readHoldingRegisters(uint16_t address, uint16_t quantity) override;
 
     /**
      * @brief Interface specific implementation for reading Coils.
@@ -102,7 +105,7 @@ class ModbusTCPManager : public ModbusTransport {
      * @param quantity Number of coils.
      * @return true if successful.
      */
-    bool readCoils(int address, int quantity) override; 
+    esp_err_t readCoils(int address, int quantity) override; 
 };
 
 #endif

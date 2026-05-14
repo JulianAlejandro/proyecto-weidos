@@ -1,5 +1,7 @@
 #include "ModbusRTUManager.h"
 
+static const char* TAG = "MB_RTU_MGR";
+
 /**
  * @brief Initialize members with default serial and pin values.
  */
@@ -24,16 +26,17 @@ void ModbusRTUManager::setPins(int tx, int de, int re) {
 /**
  * @brief Sets up the RS485 flow control and starts the serial client.
  */
-bool ModbusRTUManager::begin() {
-    // Apply flow control pins to the underlying RS485 driver
+esp_err_t ModbusRTUManager::begin() {
+    ESP_LOGI(TAG, "Iniciando RTU (RS485) a %d bps...", _baudrate);
+    
     RS485.setPins(_txPin, _dePin, _rePin);
     
     if (!ModbusRTUClient.begin(_baudrate, _config)) {
-        //Serial.println(F("RTU Error: Failed to start Modbus client."));
-        return false;
+        ESP_LOGE(TAG, "Error crítico: No se pudo inicializar ModbusRTUClient (¿Puerto ocupado?)");
+        return ESP_ERR_MODBUS_NOT_READY;
     }
-    //Serial.println(F("RTU Status: Client initialized successfully."));
-    return true;
+    
+    return ESP_OK;
 }
 
 /**
@@ -45,16 +48,19 @@ bool ModbusRTUManager::connected() {
 }
 
 /**
- * @brief Executes a generic Modbus request.
- * Logs slave-specific errors to the Serial port for debugging.
+ * @brief Ejecución de petición genérica con detección de errores de bus.
  */
-bool ModbusRTUManager::requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) {
+esp_err_t ModbusRTUManager::requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) {
     if (!ModbusRTUClient.requestFrom(slaveAddress, type, address, nb)) {
-        //Serial.print(F("RTU Error: Request failed for slave "));
-        //Serial.println(slaveAddress);
-        return false;
+        // En RTU, un fallo suele ser por Timeout (el esclavo no responde)
+        // o por CRC Error (ruido en el cable).
+        ESP_LOGE(TAG, "Error RTU: Fallo en petición a esclavo %d (Addr: 0x%04X)", slaveAddress, address);
+        
+        // El cliente de ArduinoModbus no diferencia internamente entre CRC y Timeout,
+        // pero por estadística en RS485 solemos reportar Timeout si no hay respuesta válida.
+        return ESP_ERR_MODBUS_TIMEOUT;
     }
-    return true;
+    return ESP_OK;
 }
 
 /**
@@ -65,29 +71,37 @@ uint16_t ModbusRTUManager::read() {
 }
 
 /**
- * @brief Implementation of Holding Register reads via the abstraction layer.
+ * @brief Lectura de registros Holding.
  */
-bool ModbusRTUManager::readHoldingRegisters(uint16_t address, uint16_t quantity) {
+esp_err_t ModbusRTUManager::readHoldingRegisters(uint16_t address, uint16_t quantity) {
     return requestFrom(_slaveID, HOLDING_REGISTERS, address, quantity);
 }
 
 /**
- * @brief Implementation of Coil reads via the abstraction layer.
+ * @brief Lectura de Coils.
  */
-bool ModbusRTUManager::readCoils(int address, int quantity) {
+esp_err_t ModbusRTUManager::readCoils(int address, int quantity) {
     return requestFrom(_slaveID, COILS, (uint16_t)address, (uint16_t)quantity);
 }
 
 /**
- * @brief Direct write to a Holding Register.
+ * @brief Escritura de registro con validación.
  */
-bool ModbusRTUManager::writeHoldingRegister(uint16_t address, uint16_t value) {
-    return ModbusRTUClient.holdingRegisterWrite(_slaveID, address, value);
+esp_err_t ModbusRTUManager::writeHoldingRegister(uint16_t address, uint16_t value) {
+    if (!ModbusRTUClient.holdingRegisterWrite(_slaveID, address, value)) {
+        ESP_LOGE(TAG, "Error RTU: Fallo al escribir Holding Reg @ 0x%04X", address);
+        return ESP_ERR_MODBUS_TIMEOUT;
+    }
+    return ESP_OK;
 }
 
 /**
- * @brief Direct write to a specific Coil.
+ * @brief Escritura de Coil con validación.
  */
-bool ModbusRTUManager::writeCoil(uint16_t address, bool value) {
-    return ModbusRTUClient.coilWrite(_slaveID, address, value);
+esp_err_t ModbusRTUManager::writeCoil(uint16_t address, bool value) {
+    if (!ModbusRTUClient.coilWrite(_slaveID, address, value)) {
+        ESP_LOGE(TAG, "Error RTU: Fallo al escribir Coil @ 0x%04X", address);
+        return ESP_ERR_MODBUS_TIMEOUT;
+    }
+    return ESP_OK;
 }

@@ -2,20 +2,28 @@
 #define SD_MANAGER_H
 
 #include <Arduino.h>
-#include <vector>
 #include <SD.h>
+#include <esp_err.h>
+
+#define ESP_ERR_SD_BASE           0x40000
+#define ESP_ERR_SD_NOT_INIT       (ESP_ERR_SD_BASE + 1)
+#define ESP_ERR_SD_MOUNT          (ESP_ERR_SD_BASE + 2) // Fallo físico o de formato
+#define ESP_ERR_SD_FILE_NOT_FOUND (ESP_ERR_SD_BASE + 3)
+#define ESP_ERR_SD_WRITE_FAIL     (ESP_ERR_SD_BASE + 4)
+#define ESP_ERR_SD_DIR_FAIL       (ESP_ERR_SD_BASE + 5)
 
 /** * @brief Callback types for file processing.
  * LineCallback: Used for processing a file line by line.
  * StreamCallback: Used for direct access to the File stream.
  */
-typedef void (*LineCallback)(const char* line, void* context);
+//typedef void (*LineCallback)(const char* line, void* context);
 typedef void (*StreamCallback)(Stream& stream, void* context);
 
 class SDManager {
 private:
-    File _currentFile; 
+    //File _currentFile; 
     bool _initialized = false;
+    static const char* TAG; 
 
 public:
     /**
@@ -27,7 +35,7 @@ public:
      * @brief Initializes the SD card using the default SPI bus.
      * @return true if initialization was successful, false otherwise.
      */
-    bool begin();
+    esp_err_t begin();
 
     /**
      * @brief Checks if the SD card is initialized and ready for operations.
@@ -40,14 +48,14 @@ public:
      * @param path Full path to the file.
      * @return true if file exists or was created successfully.
      */
-    bool createFile(const char* path);
+    esp_err_t createFile(const char* path);
 
     /**
      * @brief Creates a directory on the SD card.
      * @param path Full path of the directory.
      * @return true if directory exists or was created successfully.
      */
-    bool createDirectory(const char* path);
+    esp_err_t createDirectory(const char* path);
 
     /**
      * @brief Checks if a file or directory exists at the given path.
@@ -84,11 +92,11 @@ public:
      * @param context Pointer to user data for the callback.
      * @return true if file was opened successfully.
      */
-    bool withFile(const char* path, StreamCallback callback, void* context);
+    esp_err_t withFile(const char* path, StreamCallback callback, void* context);
 
-    bool withFileWrite(const char* path, StreamCallback callback, void* context);
+    esp_err_t withFileWrite(const char* path, StreamCallback callback, void* context);
 
-    bool deleteFile(const char* path);
+    esp_err_t deleteFile(const char* path);
 };
 
 #endif

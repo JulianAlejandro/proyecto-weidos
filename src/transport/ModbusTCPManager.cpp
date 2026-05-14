@@ -1,103 +1,135 @@
 #include "ModbusTCPManager.h"
 
+static const char* TAG = "MB_TCP_MGR";
+
 /**
- * @brief Automatic reconnection management.
- * Ensures the socket is properly cleared before attempting a retry to prevent 
- * resource leaks in the Wiznet/Ethernet hardware.
+ * @brief Gestión de reconexión con reporte de estado detallado.
+ * Se ha cambiado el retorno a esp_err_t para diferenciar entre 
+ * errores de socket y errores de configuración.
  */
-bool ModbusTCPManager::ensureConnection() {
-    if (!_modbusClient.connected()) {
-        // Stop the client to free up socket resources on the Ethernet chip
-        _modbusClient.stop(); 
-        
-        //Serial.println(F("ModbusTCP: Attempting to connect to server..."));
-        
-        if (!_modbusClient.begin(_serverIP, _port)) {
-            //Serial.println(F("ModbusTCP: TCP connection failed."));
-            return false;
-        }
-        
-        // Brief delay for handshake stabilization
-        delay(50); 
-        //Serial.println(F("ModbusTCP: Successfully connected."));
+esp_err_t ModbusTCPManager::ensureConnection() {
+    if (_modbusClient.connected()) {
+        return ESP_OK;
     }
-    return true;
+
+    // Liberar recursos del socket antes de reintentar
+    _modbusClient.stop(); 
+    
+    ESP_LOGW(TAG, "Reintentando conexión con servidor %s:%d", _serverIP.toString().c_str(), _port);
+    
+    if (!_modbusClient.begin(_serverIP, _port)) {
+        ESP_LOGE(TAG, "Error de transporte: No se pudo abrir el socket TCP");
+        return ESP_ERR_MODBUS_TCP_SOCKET; 
+    }
+    
+    delay(50); // Tiempo de cortesía para el handshake TCP
+    ESP_LOGI(TAG, "Conexión establecida con éxito");
+    return ESP_OK;
 }
 
 /**
- * @brief Specific hardware initialization for the Ethernet peripheral.
+ * @brief Inicialización de hardware Ethernet.
  */
-void ModbusTCPManager::begin(byte mac[], IPAddress localIP) {
+esp_err_t ModbusTCPManager::begin(byte mac[], IPAddress localIP) {
+    ESP_LOGI(TAG, "Inicializando chip Ethernet...");
     Ethernet.init(ETHERNET_CS); 
     Ethernet.begin(mac, localIP);
-    delay(1000); // Allow network hardware to stabilize
+    
+    // Verificación de hardware físico
+    if (Ethernet.hardwareStatus() == EthernetNoHardware) {
+        ESP_LOGE(TAG, "Hardware Ethernet no detectado");
+        return ESP_ERR_NOT_FOUND;
+    }
+    
+    delay(1000); 
+    return ESP_OK;
 }
 
 /**
- * @brief Implements the begin() method required by the ModbusTransport interface.
- * Triggers the initial TCP connection.
+ * @brief Implementación de la interfaz: inicia la conexión Modbus.
  */
-bool ModbusTCPManager::begin() {
+esp_err_t ModbusTCPManager::begin() {
     return ensureConnection();
 }
 
 /**
- * @brief Reads Holding Registers using the Modbus TCP protocol.
- * Forces a client stop if the request fails to reset the state machine.
+ * @brief Lectura de Holding Registers.
+ * Propaga el error de conexión si falla, o devuelve TIMEOUT si el server no responde.
  */
-bool ModbusTCPManager::readHoldingRegisters(uint16_t address, uint16_t quantity) {
-    if (!ensureConnection()) return false;
+esp_err_t ModbusTCPManager::readHoldingRegisters(uint16_t address, uint16_t quantity) {
+    esp_err_t status = ensureConnection();
+    if (status != ESP_OK) return status;
 
     if (!_modbusClient.requestFrom(_slaveID, HOLDING_REGISTERS, address, quantity)) {
-        //Serial.println(F("ModbusTCP: Request failed. Forcing stop..."));
-        _modbusClient.stop(); 
-        return false;
+        ESP_LOGE(TAG, "Fallo en lectura Regs @ 0x%04X. Cerrando socket.", address);
+        _modbusClient.stop(); // Forzamos cierre para limpiar el buffer en caso de error
+        return ESP_ERR_MODBUS_TIMEOUT;
     }
-    return true;
+    return ESP_OK;
 }
 
 /**
- * @brief Reads Coils from the target slave address.
+ * @brief Lectura de Coils.
  */
-bool ModbusTCPManager::readCoils(int address, int quantity) {
-    if (!ensureConnection()) return false;
-    return _modbusClient.requestFrom(_slaveID, COILS, address, quantity);
+esp_err_t ModbusTCPManager::readCoils(int address, int quantity) {
+    esp_err_t status = ensureConnection();
+    if (status != ESP_OK) return status;
+
+    if (!_modbusClient.requestFrom(_slaveID, COILS, address, quantity)) {
+        return ESP_ERR_MODBUS_TIMEOUT;
+    }
+    return ESP_OK;
 }
 
 /**
- * @brief Writes a single value to a Holding Register.
+ * @brief Escritura de registro.
  */
-bool ModbusTCPManager::writeHoldingRegister(uint16_t address, uint16_t value) {
-  if (!ensureConnection()) return false;
-  return _modbusClient.holdingRegisterWrite(_slaveID, address, value);
+esp_err_t ModbusTCPManager::writeHoldingRegister(uint16_t address, uint16_t value) {
+    esp_err_t status = ensureConnection();
+    if (status != ESP_OK) return status;
+
+    if (!_modbusClient.holdingRegisterWrite(_slaveID, address, value)) {
+        return ESP_ERR_MODBUS_TIMEOUT;
+    }
+    return ESP_OK;
 }
 
 /**
  * @brief Fetches data from the internal Modbus response buffer.
  */
 uint16_t ModbusTCPManager::read() {
-  return _modbusClient.read();
+    return _modbusClient.read();
 }
 
 /**
- * @brief Writes a single state to a specific Coil.
+ * @brief Escritura de Coil.
  */
-bool ModbusTCPManager::writeCoil(uint16_t address, bool value) {
-    if (!ensureConnection()) return false;
-    return _modbusClient.coilWrite(_slaveID, address, value);
+esp_err_t ModbusTCPManager::writeCoil(uint16_t address, bool value) {
+    esp_err_t status = ensureConnection();
+    if (status != ESP_OK) return status;
+
+    if (!_modbusClient.coilWrite(_slaveID, address, value)) {
+        return ESP_ERR_MODBUS_TIMEOUT;
+    }
+    return ESP_OK;
 }
 
 /**
  * @brief Checks if the TCP socket is currently active.
  */
 bool ModbusTCPManager::connected() {
-  return _modbusClient.connected();
+    return _modbusClient.connected();
 }
 
 /**
- * @brief Implements the generic requestFrom logic for use within the abstraction layer.
+ * @brief Implementación genérica requestFrom (Interface polimórfica).
  */
-bool ModbusTCPManager::requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb){
-    if (!ensureConnection()) return false;
-    return _modbusClient.requestFrom(slaveAddress, type, address, nb);
+esp_err_t ModbusTCPManager::requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb){
+    esp_err_t status = ensureConnection();
+    if (status != ESP_OK) return status;
+
+    if (!_modbusClient.requestFrom(slaveAddress, type, address, nb)) {
+        return ESP_ERR_MODBUS_TIMEOUT;
+    }
+    return ESP_OK;
 }

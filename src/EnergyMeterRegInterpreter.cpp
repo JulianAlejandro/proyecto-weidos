@@ -28,13 +28,10 @@ EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager)
 /**
  * @brief Checks if the SD manager is ready and initializes the interpreter.
  */
-int EnergyMeterRegInterpreter::begin(){
-    if (!_sd->isReady()) { 
-        //Serial.println(F("Interpreter: SDManager not ready yet."));
-        return false;
-    }
+esp_err_t EnergyMeterRegInterpreter::begin(){
+    if (!_sd->isReady()) return ESP_ERR_SD_NOT_INIT;
     _initialized = true; 
-    return true;
+    return ESP_OK;
 }
 
 /**
@@ -100,30 +97,23 @@ void EnergyMeterRegInterpreter::processParserData(CSV_Parser& cp, uint16_t start
 /**
  * @brief Initializes a new request by parsing the register map from SD.
  */
-EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
+esp_err_t EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size, EM_request *out_req) {
+    if(!_initialized) return ESP_ERR_INTERPRETER_NOT_INIT;
+
     _current_request.start_addr = 0;
     _current_request.size = 0;
     _registrySize = 0;
 
-    if(!_initialized){
-        //Serial.println(F("Interpreter not initialized."));
-        return _current_request;
-    }
-
     StreamContext ctx = {this, start_addr, size};
         
-    _sd->withFile(MAP_FILE, [](Stream& file, void* arg) {
+    // Propagamos el error que devuelva withFile (ej: 0x40003 si no existe el archivo)
+    esp_err_t err = _sd->withFile(MAP_FILE, [](Stream& file, void* arg) {
         StreamContext* sc = (StreamContext*)arg;
-        
-        // Skip metadata lines and jump to the register map table
         for (int i = 0; i < LINE_MAP_START; i++) {
             if (file.available()) file.readStringUntil('\n'); 
         }
 
-        // Initialize CSV Parser: L=Long/Int32, s=String
         CSV_Parser cp("Lssss", true, ';');
-
-        // Feed file stream into the parser
         while (file.available()) {
             String line = file.readStringUntil('\n');
             if (line.length() > 0) {
@@ -131,13 +121,16 @@ EM_request EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr,
                 cp << line.c_str();
             }
         }
-
-        // Process parsed results
         sc->instance->processParserData(cp, sc->start_addr, sc->size);
-
     }, &ctx);
+
+    if (err != ESP_OK) return err;
+    if (_registrySize == 0) return ESP_ERR_INTERPRETER_MAP_MISS;
+
     _current_request.start_addr = _registryBuffer[0].address; 
-    return _current_request;
+    if (out_req) *out_req = _current_request;
+    
+    return ESP_OK;
 }
 
 /**
@@ -319,59 +312,35 @@ Parameters EnergyMeterRegInterpreter::getParameters(){
 /**
  * @brief Validates input requirements and prepares the SD log session.
  */
-bool EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc) {
-
+esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc) {
     _advancedIsInitialized = false;
 
-    // Validation filters
-    if (MB_req.channel <= 0) return false;
-    if (MB_req.start_addres >= MAX_EM_ADDR) return false;
-    if (MB_req.length == 0 || MB_req.length > MAX_MODBUS_REGS_REQUEST) return false;
-    if ((MB_req.start_addres + MB_req.length) > MAX_EM_ADDR) return false;
-    if (MB_req.func_code < 1 || MB_req.func_code > 4) return false;
-    if (MB_req.req_interval_ms < 1000) return false;
+    // Validaciones de negocio
+    if (MB_req.channel <= 0) return ESP_ERR_INVALID_ARG;
+    if (MB_req.length == 0 || MB_req.length > MAX_MODBUS_REGS_REQUEST) return ESP_ERR_INVALID_SIZE;
     
-    startNewRequest(MB_req.start_addres, MB_req.length);
+    // Intentar cargar mapa
+    esp_err_t err = startNewRequest(MB_req.start_addres, MB_req.length, nullptr);
+    if (err != ESP_OK) return err;
 
-
-    if(_current_request.size == 0) return false;
-    
     _misTitulos = getLastNameValues();
-    if(_misTitulos.size == 0) return false;
+    if(_misTitulos.size == 0) return ESP_ERR_INTERPRETER_MAP_MISS;
     
+    // Cargar parámetros adicionales
     loadParametersMapRegister(); 
     Parameters param = getParameters();
-
+    
     _int_log_interval = atoi(param.log_interval);
-    _new_file_interval_s = getLogIntervalFromString(param.new_file);
     _int_max_files = atoi(param.max_files);
 
-    
-    // Business Logic Constraints
-    //if (_int_log_interval != (int)MB_req.req_interval_ms) return false;
-    //if (_new_file_interval_s != 3600) return false; // Hardcoded to 1 hour for now
-    if (_int_max_files <= 0 || _int_max_files >= MAX_LOG_CAPACITY) return false;
-   
-   //if (_int_log_interval != (int)MB_req.req_interval_ms) return false;
-   //if (_new_file_interval_s <= _int_log_interval) return false; // Hardcoded to 1 hour for now
-   //if (_int_max_files <= 0 || _int_max_files >= 50) return false;
-
+    if (_int_max_files <= 0 || _int_max_files >= MAX_LOG_CAPACITY) {
+        return ESP_ERR_INTERPRETER_BAD_CONF;
+    }
 
     datalogger->setMaxFiles(_int_max_files);
-
-    //datalogger->clearAllLogs(); // Optional: clears folder on every reboot
-    /*
-    if(!crear_nueva_sesion_log(datalogger, rtc, &_misTitulos)) {
-        //Serial.println(F("Error: Failed to create log session."));
-        return false; 
-    }
-     */
-
-    anteriorMillisModbus = 0;
-    //anteriorMillisArchivo = 0;
-
+    
     _advancedIsInitialized = true;
-    return true; 
+    return ESP_OK; 
 }
 
 
@@ -506,20 +475,20 @@ bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValu
     const char* actual = datalogger->getCurrentLogFile();
 
     // --- DEBUG LOGS ---
-    Serial.println(F("--- Comparación de Sesión ---"));
-    Serial.print(F("Nueva sugerencia (nombreFichero): ")); 
-    Serial.println(nombreFichero);
-    Serial.print(F("Sesión activa (actual): ")); 
-    Serial.println(actual[0] == '\0' ? "[VACÍO]" : actual);
+   //Serial.println(F("--- Comparación de Sesión ---"));
+   //Serial.print(F("Nueva sugerencia (nombreFichero): ")); 
+   //Serial.println(nombreFichero);
+   //Serial.print(F("Sesión activa (actual): ")); 
+   //Serial.println(actual[0] == '\0' ? "[VACÍO]" : actual);
     // ------------------
 
     // Verificamos si nombreFichero está contenido en la ruta actual
     if (actual[0] != '\0' && strstr(actual, nombreFichero) != nullptr) {
-        Serial.println(F(">> COINCIDENCIA DETECTADA: Manteniendo sesión actual.")); 
+        //Serial.println(F(">> COINCIDENCIA DETECTADA: Manteniendo sesión actual.")); 
         return true; 
     }
 
-    Serial.println(F(">> NO COINCIDE: Creando nueva sesión...")); 
+    //Serial.println(F(">> NO COINCIDE: Creando nueva sesión...")); 
     return datalogger->newSesion(nombreFichero, misTitulos->buffer, misTitulos->size);
 }
 
@@ -528,26 +497,32 @@ bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValu
  */
 void EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req){
     
-  //Serial.println(F("Writing data row to log..."));
+    // 1. Ejecutar Modbus y capturar error
+    esp_err_t err = em->executeRequest(req);
+    
+    if (err != ESP_OK) {
+        ESP_LOGE("INTERP", "Fallo Modbus: 0x%X", err);
+        return; // No intentamos procesar datos basura
+    }
 
-  if (!em->executeRequest(req)) { 
-      //Serial.println(F("Error: Modbus request execution failed."));
-  } else {
+    // 2. Procesar datos (esto es interno, confiamos en el buffer)
     rawDataBuffer raw = em->readDataBuffer();
     getBufferDataRaw(raw.buffer, raw.size);
     netDataString res = getBufNetDataString(); 
 
+    // 3. Obtener tiempo
     DateTime now = rtc->now();
     char bufferTime[20];
-    sprintf(bufferTime, "%04d-%02d-%02d %02d:%02d:%02d", 
+    snprintf(bufferTime, sizeof(bufferTime), "%04d-%02d-%02d %02d:%02d:%02d", 
             now.year(), now.month(), now.day(), 
             now.hour(), now.minute(), now.second());
 
-    if(!datalogger->writeRow(bufferTime, res.buffer, res.size)){
-        //Serial.println(F("Error: Writing to SD failed.")); 
-    } 
-    datalogger->printLogToSerial();
-  }
+    // 4. Intentar escribir en SD y capturar error
+    // (Asumiendo que writeRow de Datalogger también se actualiza a esp_err_t)
+    if(datalogger->writeRow(bufferTime, res.buffer, res.size)){
+         datalogger->printLogToSerial();
+    }
+    
 }
 
 /**

@@ -1,84 +1,73 @@
 #include "EnergyMeter750.h"
 
-/**
- * @brief Default constructor. Initialization happens in begin().
- */
-EnergyMeter750::EnergyMeter750() {
-}
+EnergyMeter750::EnergyMeter750() {}
 
-/**
- * @brief Sets the transport layer and marks the driver as ready.
- * @param modbus Reference to the Modbus communication object.
- */
-int EnergyMeter750::begin(ModbusTransport* modbus) {
-    if(modbus == nullptr){
-        return false;
+esp_err_t EnergyMeter750::begin(ModbusTransport* modbus) {
+    if (modbus == nullptr) {
+        ESP_LOGE(TAG, "Fallo al iniciar: Puntero Modbus nulo");
+        return ESP_ERR_INVALID_ARG;
     }
     _modbus = modbus;
     _initialized = true;
-    return true;
+    ESP_LOGI(TAG, "Controlador EM750 inicializado correctamente");
+    return ESP_OK;
 }
 
-/**
- * @brief Validates and executes a Modbus read operation.
- * * Performs three safety checks:
- * 1. Validates that size is within MAX_MODBUS_REGS.
- * 2. Validates that the start address exists in the EM750 map.
- * 3. Validates that the full block (start + size) does not exceed memory limits.
- */
-bool EnergyMeter750::executeRequest(EM_request req) {
-    if(!_initialized) return false; 
+esp_err_t EnergyMeter750::executeRequest(EM_request req) {
+    if (!_initialized) {
+        ESP_LOGW(TAG, "Intento de ejecución sin inicializar");
+        return ESP_ERR_EM750_NOT_INIT;
+    }
 
-    _lastReadSize = 0; // Preemptive reset
-
-    // 1. Validate request size
+    // 1. Validaciones previas
     if (req.size == 0 || req.size > MAX_MODBUS_REGS_REQUEST) {
-        return false;
+        ESP_LOGE(TAG, "Tamaño de request inválido: %d", req.size);
+        return ESP_ERR_INVALID_SIZE;
     }
 
-    // 2. Validate start address range
-    if (req.start_addr > MAX_EM_ADDR) {
-        return false;
+    if (req.start_addr > MAX_EM_ADDR || (req.start_addr + req.size - 1) > MAX_EM_ADDR) {
+        ESP_LOGE(TAG, "Dirección fuera de rango: 0x%04X", req.start_addr);
+        return ESP_ERR_EM750_ADDR_OUT_RANGE;
     }
 
-    // 3. Validate that the full block (start + size) is within the device map
-    // We subtract 1 because addr 20000 with size 1 ends at addr 20000.
-    if ((req.start_addr + req.size - 1) > MAX_EM_ADDR) {
-        return false;
-    }
+    _lastReadSize = 0;
 
-    // Perform the Modbus read
-    if(_modbus->readHoldingRegisters(req.start_addr, req.size)){
-        int i = 0;
-        // Transfer data from transport buffer to local internal buffer
-        for (i = 0; i < req.size; i++) {
-            _internalBuffer[i] = _modbus->read(); 
+    // 2. Ejecución del transporte
+    // Capturamos el esp_err_t que devuelve el transport (TCP o RTU)
+    esp_err_t err = _modbus->readHoldingRegisters(req.start_addr, req.size);
+
+    if (err == ESP_OK) {
+        // Solo si la comunicación fue exitosa (ESP_OK = 0), leemos el buffer
+        for (int i = 0; i < req.size; i++) {
+            _internalBuffer[i] = _modbus->read();
         }
-        _lastReadSize = i; 
-        return true; 
-    } 
-
-    return false;
-}
-
-/**
- * @brief Returns the structure used to access the internal raw data.
- */
-rawDataBuffer EnergyMeter750::readDataBuffer(){ 
-    return { _internalBuffer, _lastReadSize };
-}
-
-/**
- * @brief Reads a single register. Used for isolated parameters 
- * that do not require full buffer updates.
- */
-uint16_t EnergyMeter750::readRegByAdress(uint16_t addr){
-    if(!_initialized) return 0; 
-
-    // Request exactly 1 register
-    if(_modbus->readHoldingRegisters(addr, 1)) {
-        return _modbus->read();
+        _lastReadSize = req.size;
+        return ESP_OK;
     }
-    
-    return 0;
+
+    // 3. Si hubo error, lo propagamos tal cual vino del transporte
+    ESP_LOGE(TAG, "Error Modbus (0x%X) en dirección 0x%04X", err, req.start_addr);
+    return err; 
+}
+
+
+
+esp_err_t EnergyMeter750::readRegByAdress(uint16_t addr, uint16_t *out_value) {
+    if (!_initialized) return ESP_ERR_EM750_NOT_INIT;
+    if (out_value == nullptr) return ESP_ERR_INVALID_ARG;
+
+    // Capturamos el error del transporte
+    esp_err_t err = _modbus->readHoldingRegisters(addr, 1);
+
+    if (err == ESP_OK) {
+        *out_value = _modbus->read();
+        return ESP_OK;
+    }
+
+    // Propagamos el error (Timeout, Connection Fail, etc.)
+    return err;
+}
+
+rawDataBuffer EnergyMeter750::readDataBuffer() {
+    return { _internalBuffer, _lastReadSize };
 }

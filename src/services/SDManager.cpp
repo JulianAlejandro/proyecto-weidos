@@ -1,6 +1,7 @@
 #include "SDManager.h"
 #include <SPI.h>
 
+const char* SDManager::TAG = "SD_MGR";
 /**
  * @brief Default constructor.
  */
@@ -10,14 +11,18 @@ SDManager::SDManager() {}
  * @brief Starts the SD card hardware communication.
  * Validates the SPI connection and FAT file system mounting.
  */
-bool SDManager::begin() {
-    // Avoid re-initialization if already active
-    if (_initialized) return true;
+esp_err_t SDManager::begin() {
+    if (_initialized) return ESP_OK;
 
-    // Standard SD.begin() returns true if SPI hardware and FAT system respond
-    _initialized = SD.begin(); 
-    
-    return _initialized;
+    // Intentamos montar la tarjeta
+    if (!SD.begin()) {
+        ESP_LOGE(TAG, "Fallo crítico: No se pudo montar la tarjeta SD");
+        return ESP_ERR_SD_MOUNT;
+    }
+
+    _initialized = true;
+    ESP_LOGI(TAG, "Tarjeta SD montada correctamente");
+    return ESP_OK;
 }
 
 /**
@@ -30,17 +35,19 @@ bool SDManager::isReady() {
 /**
  * @brief Ensures a file exists. If it doesn't, it creates an empty one.
  */
-bool SDManager::createFile(const char* path) {
-    if (SD.exists(path)) {
-        return true; 
-    }
-    // Open in WRITE mode to force file creation
+esp_err_t SDManager::createFile(const char* path) {
+    if (!_initialized) return ESP_ERR_SD_NOT_INIT;
+
+    if (SD.exists(path)) return ESP_OK;
+
     File f = SD.open(path, FILE_WRITE);
     if (f) {
         f.close();
-        return true;
+        return ESP_OK;
     }
-    return false; // Creation failed (e.g., SD full or invalid name)
+    
+    ESP_LOGE(TAG, "Error al crear archivo: %s", path);
+    return ESP_ERR_SD_WRITE_FAIL;
 }
 
 /**
@@ -55,6 +62,8 @@ bool SDManager::exists(const char* path) {
  * Uses O_TRUNC to reset file size to 0.
  */
 void SDManager::clearFile(const char* path) {
+    if (!_initialized) return;
+    // O_TRUNC borra el contenido
     File f = SD.open(path, O_WRITE | O_CREAT | O_TRUNC); 
     if (f) f.close(); 
 }
@@ -76,11 +85,9 @@ bool SDManager::appendLine(const char* path, const char* data) {
  * @brief Utility for debugging. Prints the full file content to Serial.
  */
 void SDManager::printFileToSerial(const char* path) {
+    if (!_initialized) return;
     File f = SD.open(path, FILE_READ);
-    if (!f) {
-        //Serial.println(F("SDManager Error: Could not open file for Serial output."));
-        return;
-    }
+    if (!f) return;
     
     while (f.available()) {
         Serial.write(f.read());
@@ -91,14 +98,17 @@ void SDManager::printFileToSerial(const char* path) {
 /**
  * @brief Creates a directory structure.
  */
-bool SDManager::createDirectory(const char* path) {
-    if (!_initialized) return false;
+esp_err_t SDManager::createDirectory(const char* path) {
+    if (!_initialized) return ESP_ERR_SD_NOT_INIT;
 
-    if (SD.exists(path)) {
-        return true; 
+    if (SD.exists(path)) return ESP_OK;
+
+    if (SD.mkdir(path)) {
+        return ESP_OK;
     }
 
-    return SD.mkdir(path);
+    ESP_LOGE(TAG, "Fallo al crear directorio: %s", path);
+    return ESP_ERR_SD_DIR_FAIL;
 }
 
 /**
@@ -106,42 +116,49 @@ bool SDManager::createDirectory(const char* path) {
  * @param path Full path to the file.
  * @return true if the file was successfully deleted or didn't exist, false if deletion failed.
  */
-bool SDManager::deleteFile(const char* path) {
-    if (!_initialized) return false;
+esp_err_t SDManager::deleteFile(const char* path) {
+    if (!_initialized) return ESP_ERR_SD_NOT_INIT;
 
-    // Si el archivo no existe, técnicamente la tarea de "eliminarlo" es un éxito
-    if (!SD.exists(path)) return true;
+    if (!SD.exists(path)) return ESP_OK;
 
-    return SD.remove(path);
+    if (SD.remove(path)) {
+        return ESP_OK;
+    }
+
+    ESP_LOGE(TAG, "Fallo al eliminar archivo: %s", path);
+    return ESP_ERR_SD_WRITE_FAIL;
 }
 
 /**
  * @brief Higher-order function to handle file streaming via callbacks.
  * Ensures the file is safely closed after the callback execution.
  */
-bool SDManager::withFile(const char* path, StreamCallback callback, void* context) {
-    if (!_initialized) return false;
+esp_err_t SDManager::withFile(const char* path, StreamCallback callback, void* context) {
+    if (!_initialized) return ESP_ERR_SD_NOT_INIT;
 
-    File file = SD.open(path);
-    if (!file) return false;
+    File file = SD.open(path, FILE_READ);
+    if (!file) {
+        ESP_LOGW(TAG, "Archivo no encontrado para lectura: %s", path);
+        return ESP_ERR_SD_FILE_NOT_FOUND;
+    }
 
-    // Pass the file stream to the external processing function
     callback(file, context);
-    
     file.close();
-    return true;
+    return ESP_OK;
 }
 
 
 // Versión modificada de withFile para permitir escritura
-bool SDManager::withFileWrite(const char* path, StreamCallback callback, void* context) {
-    if (!_initialized) return false;
+esp_err_t SDManager::withFileWrite(const char* path, StreamCallback callback, void* context) {
+    if (!_initialized) return ESP_ERR_SD_NOT_INIT;
 
-    File file = SD.open(path, FILE_WRITE); // Ahora usa el modo pasado por parámetro
-    if (!file) return false;
+    File file = SD.open(path, FILE_WRITE);
+    if (!file) {
+        ESP_LOGE(TAG, "No se pudo abrir para escritura: %s", path);
+        return ESP_ERR_SD_WRITE_FAIL;
+    }
 
     callback(file, context);
-    
     file.close();
-    return true;
+    return ESP_OK;
 }

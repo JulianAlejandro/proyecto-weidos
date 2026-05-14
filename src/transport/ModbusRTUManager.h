@@ -35,7 +35,7 @@ class ModbusRTUManager : public ModbusTransport {
      * @brief Initializes the RS485 hardware and the Modbus RTU Client.
      * @return true if the client started successfully.
      */
-    bool begin() override;
+    esp_err_t begin() override;
 
     /**
      * @brief Checks the "connection" status.
@@ -52,7 +52,7 @@ class ModbusRTUManager : public ModbusTransport {
      * @param nb Number of elements to read.
      * @return true if the request was sent without bus errors.
      */
-    bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) override;
+    esp_err_t requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) override;
 
     /**
      * @brief Reads the next available value from the serial buffer.
@@ -66,7 +66,7 @@ class ModbusRTUManager : public ModbusTransport {
      * @param quantity Number of registers.
      * @return true if request was successful.
      */
-    bool readHoldingRegisters(uint16_t address, uint16_t quantity) override;
+    esp_err_t readHoldingRegisters(uint16_t address, uint16_t quantity) override;
 
     /**
      * @brief Specialized read for Coils.
@@ -74,7 +74,7 @@ class ModbusRTUManager : public ModbusTransport {
      * @param quantity Number of coils.
      * @return true if request was successful.
      */
-    bool readCoils(int address, int quantity) override;
+    esp_err_t readCoils(int address, int quantity) override;
 
     /**
      * @brief Writes a single 16-bit value to a Holding Register.
@@ -82,7 +82,7 @@ class ModbusRTUManager : public ModbusTransport {
      * @param value Value to store.
      * @return true if write was successful.
      */
-    bool writeHoldingRegister(uint16_t address, uint16_t value) override;
+    esp_err_t writeHoldingRegister(uint16_t address, uint16_t value) override;
 
     /**
      * @brief Writes a single boolean value to a Coil.
@@ -90,7 +90,7 @@ class ModbusRTUManager : public ModbusTransport {
      * @param value State to write.
      * @return true if write was successful.
      */
-    bool writeCoil(uint16_t address, bool value) override;
+    esp_err_t writeCoil(uint16_t address, bool value) override;
 
     // --- RTU SPECIFIC METHODS ---
 

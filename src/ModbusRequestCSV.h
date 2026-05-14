@@ -3,6 +3,11 @@
 
 #include "services/SDManager.h"
 
+#define ESP_ERR_CONFIG_BASE         0x50000
+#define ESP_ERR_CONFIG_NOT_INIT     (ESP_ERR_CONFIG_BASE + 1)
+#define ESP_ERR_CONFIG_PARSE_FAIL   (ESP_ERR_CONFIG_BASE + 2)
+#define ESP_ERR_CONFIG_INVALID_DATA (ESP_ERR_CONFIG_BASE + 3)
+
 /**
  * @struct Struct_MBRequest
  * @brief Container for Modbus transaction parameters extracted from CSV.
@@ -29,6 +34,7 @@ class ModbusRequestCSV {
 private:
     SDManager* _sd = nullptr;
     bool _initialized = false;
+    static const char* TAG;
 
     char _device_name[MAX_TITLES_SIZE];
     char _ip_address[MAX_TITLES_SIZE];
@@ -43,13 +49,13 @@ public:
      * @brief Verifies if the SD manager is ready for operations.
      * @return true if initialized successfully.
      */
-    bool begin();
+    esp_err_t begin();
 
     /**
      * @brief Parses the first lines of the CSV to load Device Name and IP Address.
      * @return true if parameters were successfully loaded.
      */
-    bool loadFromSDParameters();
+    esp_err_t loadFromSDParameters();
 
     /**
      * @brief Gets the loaded Device Name.
@@ -65,7 +71,7 @@ public:
      * @brief Parses the CSV to extract a specific Modbus request structure.
      * @return A populated Struct_MBRequest (all zeros if parsing fails).
      */
-    Struct_MBRequest loadFromSDMbrequest(); 
+    esp_err_t loadFromSDMbrequest(Struct_MBRequest* out_request); 
 };
 
 #endif

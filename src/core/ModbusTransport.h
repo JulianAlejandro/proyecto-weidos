@@ -2,6 +2,13 @@
 #define MODBUS_TRANSPORT_H
 
 #include <Arduino.h>
+#include <esp_err.h>
+
+#define ESP_ERR_MODBUS_BASE          0x30000
+#define ESP_ERR_MODBUS_NOT_READY     (ESP_ERR_MODBUS_BASE + 1) // El bus está ocupado o no iniciado
+#define ESP_ERR_MODBUS_TIMEOUT       (ESP_ERR_MODBUS_BASE + 2) // El esclavo no respondió a tiempo
+#define ESP_ERR_MODBUS_INVALID_RESP  (ESP_ERR_MODBUS_BASE + 3) // Respuesta corrupta o CRC erróneo
+#define ESP_ERR_MODBUS_SERVER_REJECT (ESP_ERR_MODBUS_BASE + 4) // El esclavo devolvió una excepción Modbus
 
 /**
  * @class ModbusTransport
@@ -23,7 +30,7 @@ public:
      * @brief Initializes the underlying hardware, client, or bus.
      * @return true if initialization was successful.
      */
-    virtual bool begin() = 0;
+    virtual esp_err_t begin() = 0;
 
     /**
      * @brief Checks if the communication channel is active.
@@ -42,7 +49,7 @@ public:
      * @param nb The number of registers or points to read.
      * @return true if the request was successfully accepted or acknowledged by the bus.
      */
-    virtual bool requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) = 0;
+    virtual esp_err_t requestFrom(int slaveAddress, int type, uint16_t address, uint16_t nb) = 0;
 
     /**
      * @brief Fetches the next available value from the internal response buffer.
@@ -57,7 +64,7 @@ public:
      * @param quantity Number of registers to read.
      * @return true if the transaction succeeded.
      */
-    virtual bool readHoldingRegisters(uint16_t address, uint16_t quantity) = 0; 
+    virtual esp_err_t readHoldingRegisters(uint16_t address, uint16_t quantity) = 0; 
     
     /**
      * @brief Specialized request for Coils (Function Code 01).
@@ -65,7 +72,7 @@ public:
      * @param quantity Number of coils to read.
      * @return true if the transaction succeeded.
      */
-    virtual bool readCoils(int address, int quantity) = 0;
+    virtual esp_err_t readCoils(int address, int quantity) = 0;
 
     // --- Write Methods ---
 
@@ -75,7 +82,7 @@ public:
      * @param value The value to write.
      * @return true if the write operation was confirmed.
      */
-    virtual bool writeHoldingRegister(uint16_t address, uint16_t value) = 0;
+    virtual esp_err_t writeHoldingRegister(uint16_t address, uint16_t value) = 0;
 
     /**
      * @brief Writes a single boolean state to a Coil.
@@ -83,7 +90,7 @@ public:
      * @param value State to write (true/false).
      * @return true if the write operation was confirmed.
      */
-    virtual bool writeCoil(uint16_t address, bool value) = 0;
+    virtual esp_err_t writeCoil(uint16_t address, bool value) = 0;
 
     /* * FUTURE ENHANCEMENTS (Currently Commented):
      * * virtual void setConfig(void* configData) = 0; 
