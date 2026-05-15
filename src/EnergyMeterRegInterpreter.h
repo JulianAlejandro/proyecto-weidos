@@ -141,10 +141,12 @@ private:
     char _log_interval[MAX_TEXT_SIZE]; 
     char _new_file[MAX_TEXT_SIZE]; 
     char _max_files[MAX_TEXT_SIZE];
+
+    bool _creadaUnaSesion = false;
    
     int getFormatSize(coded_format f); 
     static void getNetDataString(char* dest, rawDataReg rawRegister);
-    void lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
+    esp_err_t lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
     void processParserData(CSV_Parser& cp, uint16_t start, uint16_t size);
 
 public:
@@ -188,7 +190,7 @@ public:
      * @brief Automates the entire datalogging setup and execution.
      */
     esp_err_t prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc);
-    void advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
+    esp_err_t advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
 };
 
 #endif

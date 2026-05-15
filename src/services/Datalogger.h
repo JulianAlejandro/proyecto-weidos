@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "SDManager.h"
+#include "LogBuffer.h"
 
 #define MAX_LOG_CAPACITY 150
 #define FILE_NAME_SIZE 32 // Supports full path (e.g., /LOGS/YYMMDDHH.txt)
@@ -22,6 +23,8 @@ private:
     char _currentLogFile[FILE_NAME_SIZE];           // Path of the currently active log
     SDManager* _sd;                                 // Pointer to the SD hardware manager
 
+    LogBuffer _buffer;
+
     /**
      * @brief Checks if a file has a valid logging extension (.log or .txt).
      */
@@ -32,6 +35,8 @@ private:
      * Handles circular buffer (deleting oldest) and duplicate naming.
      */
     bool addAndSetLogFile(const char* filename);
+
+    void m_pushToBuffer(const char* csvLine); 
 
 public:
     /**
@@ -104,6 +109,8 @@ public:
     const char* getCurrentLogFile() const { return _currentLogFile; }
 
     void setMaxFiles(uint16_t maxFiles);
+
+    bool flushBuffer(); 
 };
 
 #endif

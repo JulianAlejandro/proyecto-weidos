@@ -11,8 +11,8 @@ struct HeaderData {
     uint16_t numTitles;
 };
 
-void writeHeaderCallback(Stream& stream, void* context);
-void writeRowCallback(Stream& stream, void* context);
+//void writeHeaderCallback(Stream& stream, void* context);
+//void writeRowCallback(Stream& stream, void* context);
 /**
  * @brief Initialize members and clear internal buffers.
  */
@@ -219,23 +219,47 @@ void Datalogger::selectLogByIndex(uint16_t index) {
     }
 }
 
-/**
- * @brief Writes CSV header columns separated by semicolons.
- */
+
+void Datalogger::m_pushToBuffer(const char* csvLine) {
+    size_t lineLength = strlen(csvLine);
+
+    // Si la línea actual no cabe en lo que queda de búfer, primero vaciamos la RAM a la SD
+    if (lineLength > _buffer.getAvailableSpace()) {
+        flushBuffer();
+    }
+
+    // Guardamos la línea en el búfer de forma segura
+    _buffer.appendString(csvLine);
+}
+
+
 /**
  * @brief Writes CSV header columns using the file stream callback.
  */
 bool Datalogger::writeHeader(const char** titles, uint16_t numTitles) {
-    if (numTitles == 0 || _currentLogFile[0] == '\0') {
-        return false;
-    }
+    if (numTitles == 0 || _currentLogFile[0] == '\0') return false;
 
-    HeaderData data = { titles, numTitles };
+    char tempLine[256] = ""; // Búfer temporal para armar la línea del encabezado
+
+    for (uint16_t i = 0; i < numTitles; i++) {
+        if (titles[i] != nullptr) {
+            strncat(tempLine, titles[i], sizeof(tempLine) - strlen(tempLine) - 1);
+        }
+        if (i < numTitles - 1) {
+            strncat(tempLine, ";", sizeof(tempLine) - strlen(tempLine) - 1);
+        }
+    }
+    strncat(tempLine, "\n", sizeof(tempLine) - strlen(tempLine) - 1); // Salto de línea CSV
+
+    // Enviamos la línea armada al gestor del búfer
+    m_pushToBuffer(tempLine);
+    //borrar solo es prueba: 
+    //_buffer.dumpToSerial();
     
-    // Ejecutamos la escritura a través del SDManager usando el callback
-    return !_sd->withFileWrite(_currentLogFile, writeHeaderCallback, &data);
+    return true;
 }
 
+/*
 void writeHeaderCallback(Stream& stream, void* context) {
     HeaderData* data = (HeaderData*)context;
     File* file = (File*)&stream;
@@ -252,20 +276,62 @@ void writeHeaderCallback(Stream& stream, void* context) {
     }
     file->println(); // Salto de línea al final del encabezado
 }
+*/
 
 /**
  * @brief Appends a data row. Converts timestamp and value array into a semicolon-separated line.
  */
  bool Datalogger::writeRow(const char* timestamp, const char** values, uint16_t numValues) {
-    RowData data = { timestamp, values, numValues };
+    if (_currentLogFile[0] == '\0') return false;
+
+    char tempLine[512]; // Ajusta el tamaño según la longitud máxima estimada de tus filas
+    snprintf(tempLine, sizeof(tempLine), "%s", timestamp);
+
+    for (uint16_t i = 0; i < numValues; i++) {
+        strncat(tempLine, ";", sizeof(tempLine) - strlen(tempLine) - 1);
+        if (values[i] != nullptr) {
+            strncat(tempLine, values[i], sizeof(tempLine) - strlen(tempLine) - 1);
+        }
+    }
+    strncat(tempLine, "\n", sizeof(tempLine) - strlen(tempLine) - 1); // Salto de línea CSV
+
+    // Enviamos la fila armada al gestor del búfer
+    m_pushToBuffer(tempLine);
+    //_buffer.dumpToSerial();
+    return true;
+}
+
+
+// Callback exclusivo para vaciar el búfer completo a la SD
+void flushLogBufferCallback(Stream& stream, void* context) {
+    LogBuffer* buffer = (LogBuffer*)context;
+    // Escribe todos los bytes acumulados de golpe
+    stream.write(buffer->getBufferPointer(), buffer->getCurrentSize());
+}
+
+// Método público para forzar el volcado (por timeout o cierre)
+bool Datalogger::flushBuffer() {
+    // Si el búfer está vacío, no perdemos tiempo abriendo la SD
+    if (_buffer.getCurrentSize() == 0 || _currentLogFile[0] == '\0') {
+        return true;
+    }
+
+    ESP_LOGI("DATALOGGER", "Vaciando %d bytes del búfer a la SD...", _buffer.getCurrentSize());
     
-    // Llamamos a withFile pasando la estructura de datos
-    return !_sd->withFileWrite(_currentLogFile, writeRowCallback, &data);
+    // Abrimos el archivo una única vez para volcar el bloque entero
+    bool success = !_sd->withFileWrite(_currentLogFile, flushLogBufferCallback, &_buffer);
+    
+    if (success) {
+        _buffer.clear(); // Reseteamos el búfer si se escribió correctamente
+    }
+    
+    return success;
 }
 
 /**
  * @brief Appends a data row. Converts timestamp and value array into a semicolon-separated line.
  */
+ /*
 void writeRowCallback(Stream& stream, void* context) {
     // El 'context' es un puntero a una estructura con nuestros datos
     RowData* data = (RowData*)context;
@@ -280,6 +346,8 @@ void writeRowCallback(Stream& stream, void* context) {
     }
     file->println(); // Final de línea
 }
+
+*/
 
  /*
 bool Datalogger::writeRow(const char* timestamp, const char** values, uint16_t numValues) {
@@ -312,7 +380,13 @@ void Datalogger::clearLogFile() {
  * @brief Prints current log path and its contents to Serial.
  */
 void Datalogger::printLogToSerial() {
-    if (strlen(_currentLogFile) == 0) return;
+    if (strlen(_currentLogFile) == 0){
+
+        Serial.print(F("Log vacio"));
+        
+        
+        return;
+    }
     
     Serial.print(F("--- Log Content: "));
     Serial.print(_currentLogFile);
@@ -325,6 +399,10 @@ void Datalogger::printLogToSerial() {
  * @brief Orchestrates the start of a logging session: New file -> Clear -> Header.
  */
 bool Datalogger::newSesion(const char * name, const char** titles, uint16_t numTitles){
+    if (!flushBuffer()) {
+        ESP_LOGE("DATALOGGER", "Error al vaciar el búfer del log anterior antes de la nueva sesión");
+    }
+
     if(!newLog(name)) return false; 
     
     clearLogFile();
@@ -344,7 +422,7 @@ bool Datalogger::newSesion(const char * name, const char** titles, uint16_t numT
 /**
  * @brief Wipes the /LOGS directory and resets internal tracking.
  */
- //TODO
+ 
 void Datalogger::clearAllLogs() {
     File root = SD.open(DIR_LOG_NAME);
     if (!root || !root.isDirectory()) return;

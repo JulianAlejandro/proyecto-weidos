@@ -15,9 +15,8 @@ struct StreamContext {
 };
 
 // Internal Helper Prototypes
-void lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
-bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos); 
-uint32_t getLogIntervalFromString(const char* log_interval_str); 
+esp_err_t lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
+esp_err_t crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos); 
 
 EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager) 
   : _sd(sdManager) 
@@ -333,13 +332,30 @@ esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest M
     _int_log_interval = atoi(param.log_interval);
     _int_max_files = atoi(param.max_files);
 
+    Serial.print("log interval: ");
+    Serial.println(param.log_interval);
+
+       Serial.print("max files: ");
+    Serial.println(param.max_files);
+
+    Serial.print("tiempo file"); 
+    Serial.println(param.new_file);
+
+
     if (_int_max_files <= 0 || _int_max_files >= MAX_LOG_CAPACITY) {
         return ESP_ERR_INTERPRETER_BAD_CONF;
     }
 
     datalogger->setMaxFiles(_int_max_files);
+    datalogger->clearAllLogs(); // Optional: clears folder on every reboot
     
     _advancedIsInitialized = true;
+
+    err = crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
+    if(err==ESP_OK){
+        _creadaUnaSesion = true;           
+    }
+    
     return ESP_OK; 
 }
 
@@ -347,14 +363,15 @@ esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest M
 /**
  * @brief Main execution loop for timed logging and file rotation.
  */
- void EnergyMeterRegInterpreter::advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc) {
-    if (!_advancedIsInitialized) return;
+ esp_err_t EnergyMeterRegInterpreter::advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc) {
+    if (!_advancedIsInitialized) return ESP_ERR_INTERPRETER_NOT_INIT;
 
     unsigned long actualMillis = millis();
     DateTime ahora = rtc->now();
 
     // --- CAMBIO DE SESIÓN (Basado en RTC) ---
     bool debeCambiarSesion = false;
+    esp_err_t err; 
 
     // Comparamos el tiempo actual con la última vez que se cambió de archivo
     if (ahora.minute() != ultimaUnidadTiempo) { 
@@ -369,15 +386,24 @@ esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest M
 
         if (debeCambiarSesion) {
             ultimaUnidadTiempo = ahora.minute(); // Actualizamos bandera
-            crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
+            err = crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
+            if(err==ESP_OK){
+                _creadaUnaSesion = true;
+
+            }
+            if (err != ESP_OK) return err;
         }
     }
 
     // --- MUESTREO (Basado en millis) ---
     if (actualMillis - anteriorMillisModbus >= (unsigned long)_int_log_interval) {
         anteriorMillisModbus += _int_log_interval;
-        lectura_modbus(datalogger, rtc, em, _current_request);
+        if(_creadaUnaSesion == true){
+            err = lectura_modbus(datalogger, rtc, em, _current_request);
+        }
+        if (err != ESP_OK) return err;
     }
+    return ESP_OK;
 }
  /*
 void EnergyMeterRegInterpreter::advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc){
@@ -461,7 +487,7 @@ void EnergyMeterRegInterpreter::getNetDataString(char* dest, rawDataReg rawRegis
 /**
  * @brief Genera un nombre de archivo basado en el RTC y crea sesión solo si el nombre cambia.
  */
-bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos) {
+esp_err_t crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos) {
     DateTime ahora = rtc->now();
     char nombreFichero[16]; 
 
@@ -485,24 +511,29 @@ bool crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValu
     // Verificamos si nombreFichero está contenido en la ruta actual
     if (actual[0] != '\0' && strstr(actual, nombreFichero) != nullptr) {
         //Serial.println(F(">> COINCIDENCIA DETECTADA: Manteniendo sesión actual.")); 
-        return true; 
+        return ESP_OK; 
     }
 
     //Serial.println(F(">> NO COINCIDE: Creando nueva sesión...")); 
-    return datalogger->newSesion(nombreFichero, misTitulos->buffer, misTitulos->size);
+     if(datalogger->newSesion(nombreFichero, misTitulos->buffer, misTitulos->size)){
+            Serial.println("nueva session correcta");
+     }else{
+            Serial.println("nueva sesion fracaso");
+     }
+     return ESP_OK;
 }
 
 /**
  * @brief Internal Modbus task: Executes request, converts data, and writes to SD.
  */
-void EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req){
+esp_err_t EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req){
     
     // 1. Ejecutar Modbus y capturar error
     esp_err_t err = em->executeRequest(req);
     
     if (err != ESP_OK) {
         ESP_LOGE("INTERP", "Fallo Modbus: 0x%X", err);
-        return; // No intentamos procesar datos basura
+        return err; // No intentamos procesar datos basura
     }
 
     // 2. Procesar datos (esto es interno, confiamos en el buffer)
@@ -520,19 +551,10 @@ void EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_DS323
     // 4. Intentar escribir en SD y capturar error
     // (Asumiendo que writeRow de Datalogger también se actualiza a esp_err_t)
     if(datalogger->writeRow(bufferTime, res.buffer, res.size)){
-         datalogger->printLogToSerial();
+         Serial.println("se escribe un nuevo dato en el buffer"); 
+    }else{
+        Serial.println("algo va mal mal");
     }
-    
+    return ESP_OK; 
 }
 
-/**
- * @brief Converts textual interval descriptions into seconds.
- */
-uint32_t getLogIntervalFromString(const char* log_interval_str) {
-    if (log_interval_str == nullptr) return 0;
-    if (strcasecmp(log_interval_str, "minute") == 0) return 60UL;
-    if (strcasecmp(log_interval_str, "hour") == 0)   return 3600UL;
-    if (strcasecmp(log_interval_str, "day") == 0)    return 86400UL;
-    if (strcasecmp(log_interval_str, "month") == 0)  return 2592000UL; // Avg 30 days
-    return 0;
-}
