@@ -1,3 +1,168 @@
+
+#include "src/services/SDManager.h"
+#include "src/services/DataloggerFileManager.h"
+#include <RTClib.h>
+
+SDManager sd;  
+DataloggerFileManager DatManager(&sd,4); 
+RTC_DS3231 rtc;
+
+
+void check_critical_error(esp_err_t err, const char* msg) {
+    if (err != ESP_OK) {
+        Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
+        Serial.println("Reiniciando sistema en 5 segundos...");
+        
+        delay(5000); // Tiempo para que el usuario pueda leer el error en el monitor
+        while(true); 
+        
+        //ESP.restart(); // <--- Aquí generas el reset por código
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    delay(1000);
+
+    esp_err_t err;
+
+    // 1. Hardware Base: Tarjeta SD y RTC
+    err = sd.begin();
+    check_critical_error(err, "Fallo en Hardware SD");
+
+    if (!rtc.begin()) {
+        check_critical_error(ESP_FAIL, "Hardware RTC DS3231 no encontrado");
+    }
+
+    // 2. Inicializar Gestor de Datalogger
+    err = DatManager.begin(); 
+    check_critical_error(err, "Error datalogger");
+
+    // Indexa los archivos existentes y borra los que superen el límite configurado (4)
+    DatManager.setCSVLastEnvironment(true);
+
+    // 3. Obtener hora actual para el NOMBRE del nuevo archivo de sesión
+    
+    DateTime ahora = rtc.now();
+    char nombreFichero[16]; 
+    // Formato exacto requerido: MMDDHHmm (Ej: 06271240)
+    snprintf(nombreFichero, sizeof(nombreFichero), "%02d%02d%02d%02d", 
+            ahora.month(), 
+            ahora.day(), 
+            ahora.hour(),
+            ahora.minute());
+
+    // ==========================================
+    // SIMULACIÓN: DEFINICIÓN DE CABECERAS (TITLES)
+    // ==========================================
+    const char* misCabeceras[] = {"TEMP", "HUM", "PRESION"};
+    uint16_t numColumnas = sizeof(misCabeceras) / sizeof(misCabeceras[0]);
+
+    // Creamos la nueva sesión pasándole el nombre/timestamp y los títulos
+    Serial.print("[SIM] Creando nueva sesion de log: "); Serial.println(nombreFichero);
+    err = DatManager.newCSVLogSesion(nombreFichero, misCabeceras, numColumnas);
+    check_critical_error(err, "Error al crear nueva sesion CSV");
+
+    // ==========================================
+    // SIMULACIÓN: ENTRADA DE DATOS SUCESIVOS
+    // ==========================================
+    char timestampLectura[32];
+    
+    // --- LECTURA 1 ---
+    ahora = rtc.now(); // Actualizamos marca de tiempo para la fila de datos
+    snprintf(timestampLectura, sizeof(timestampLectura), "%04d/%02d/%02d %02d:%02d:%02d", 
+             ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
+    
+    const char* valores1[] = {"24.5", "60.2", "1013.2"};
+    Serial.println("[SIM] Insertando Lectura 1...");
+    DatManager.appendNewDataCSVToLog(timestampLectura, valores1, numColumnas);
+    delay(1000); 
+
+    // --- LECTURA 2 ---
+    ahora = rtc.now();
+    snprintf(timestampLectura, sizeof(timestampLectura), "%04d/%02d/%02d %02d:%02d:%02d", 
+             ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
+             
+    const char* valores2[] = {"24.6", "59.8", "1013.1"};
+    Serial.println("[SIM] Insertando Lectura 2...");
+    DatManager.appendNewDataCSVToLog(timestampLectura, valores2, numColumnas);
+    delay(1000); 
+
+    // --- LECTURA 3 ---
+    ahora = rtc.now();
+    snprintf(timestampLectura, sizeof(timestampLectura), "%04d/%02d/%02d %02d:%02d:%02d", 
+             ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
+             
+    const char* valores3[] = {"24.8", "59.5", "1012.9"};
+    Serial.println("[SIM] Insertando Lectura 3...");
+    DatManager.appendNewDataCSVToLog(timestampLectura, valores3, numColumnas);
+    delay(1000); 
+
+    // 4. Forzar el volcado del buffer a la SD físico al terminar el lote
+    Serial.println("[SIM] Volcando buffer a la tarjeta SD...");
+    DatManager.flushBuffer();
+    
+}
+
+void loop(){
+    delay(1000);
+}
+
+
+/*
+#include <RTClib.h>
+#include "src/services/SDManager.h"
+#include "src/services/DataloggerFileManager.h"
+
+
+SDManager sd;  
+DataloggerFileManager DatManager(&sd,4); 
+RTC_DS3231 rtc;
+
+
+void check_critical_error(esp_err_t err, const char* msg) {
+    if (err != ESP_OK) {
+        Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
+        Serial.println("Reiniciando sistema en 5 segundos...");
+        
+        delay(5000); // Tiempo para que el usuario pueda leer el error en el monitor
+        while(true); 
+        
+        //ESP.restart(); // <--- Aquí generas el reset por código
+    }
+}
+
+void setup(){
+     Serial.begin(115200);
+     delay(1000);
+
+    esp_err_t err;
+
+    // 1. Hardware Base: Tarjeta SD
+    err = sd.begin();
+    check_critical_error(err, "Fallo en Hardware SD");
+
+    if (!rtc.begin()) {
+    check_critical_error(ESP_FAIL, "Hardware RTC DS3231 no encontrado");
+    }
+
+    err = DatManager.begin(); 
+    check_critical_error(err, "Error datalogger");
+
+    DatManager.setCSVLastEnvironment(true);
+
+
+
+}
+
+void loop(){
+    delay(1000);
+}
+
+*/
+
+/*
+
 #include <RTClib.h>
 
 // Transport Layer implementations
@@ -26,10 +191,6 @@ EnergyMeter750 energy_meter;
 ModbusRequestCSV mb_csv(&sd);
 ModbusTransport* modbus = nullptr; // Polymorphic pointer for TCP or RTU
 
-/**
- * @brief Función auxiliar para manejar errores críticos de inicialización.
- * Imprime el código de error en hexadecimal y bloquea el sistema.
- */
 void check_critical_error(esp_err_t err, const char* msg) {
     if (err != ESP_OK) {
         Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
@@ -122,4 +283,4 @@ void loop() {
     // El delay es pequeño para mantener la responsividad
     delay(1000); 
 }
-
+*/

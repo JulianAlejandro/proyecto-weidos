@@ -162,3 +162,41 @@ esp_err_t SDManager::withFileWrite(const char* path, StreamCallback callback, vo
     file.close();
     return ESP_OK;
 }
+
+
+/**
+ * @brief Recorre los elementos de un directorio y ejecuta un callback por cada uno.
+ * @param dirPath Ruta del directorio a listar (ej: "/LOG/2026")
+ * @param callback Función que se ejecutará por cada archivo/carpeta encontrado.
+ * @param context Puntero opcional para pasar datos externos al callback.
+ */
+esp_err_t SDManager::listDirectory(const char* dirPath, FileIterationCallback callback, void* context) {
+    if (!_initialized) return ESP_ERR_SD_NOT_INIT;
+
+    // Abrimos la ruta del directorio
+    File root = SD.open(dirPath);
+    if (!root) {
+        ESP_LOGE(TAG, "Fallo al abrir el directorio: %s", dirPath);
+        return ESP_ERR_SD_DIR_FAIL; // O un error equivalente tuyo
+    }
+
+    // Validamos que realmente sea un directorio y no un archivo suelto
+    if (!root.isDirectory()) {
+        ESP_LOGW(TAG, "La ruta provista no es un directorio: %s", dirPath);
+        root.close();
+        return ESP_ERR_SD_DIR_FAIL; 
+    }
+
+    // Iteramos sobre cada elemento interno
+    File file = root.openNextFile();
+    while (file) {
+        // Ejecutamos el callback pasando el nombre del archivo y si es carpeta
+        callback(file.name(), file.isDirectory(), context);
+        
+        file.close(); // Cerramos el archivo actual antes de pedir el siguiente
+        file = root.openNextFile(); // Siguiente elemento
+    }
+
+    root.close();
+    return ESP_OK;
+}

@@ -17,6 +17,7 @@
  * StreamCallback: Used for direct access to the File stream.
  */
 //typedef void (*LineCallback)(const char* line, void* context);
+typedef void (*FileIterationCallback)(const char* fileName, bool isDir, void* context);
 typedef void (*StreamCallback)(Stream& stream, void* context);
 
 class SDManager {
@@ -97,6 +98,8 @@ public:
     esp_err_t withFileWrite(const char* path, StreamCallback callback, void* context);
 
     esp_err_t deleteFile(const char* path);
+
+    esp_err_t listDirectory(const char* dirPath, FileIterationCallback callback, void* context);
 };
 
 #endif
