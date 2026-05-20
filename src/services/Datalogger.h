@@ -1,3 +1,59 @@
+#ifndef DATALOGGER_H
+#define DATALOGGER_H
+
+#include "SDManager.h"
+#include "DataloggerFileManager.h"
+#include "LogBuffer.h"
+
+#define MAX_LOGS 4
+#define FILE_TEXT_SIZE 32 
+
+//#define MAX_FILE_SIZE_BYTES (20 * 1024 * 1024UL)
+#define MAX_FILE_SIZE_BYTES (2 * 1024UL) // DE PRUEBA
+
+class Datalogger {
+private:
+  SDManager* _sd;
+  DataloggerFileManager _fileManager;
+  LogBuffer _buffer; 
+
+  char _logPath[FILE_TEXT_SIZE];
+  bool _initialized = false;
+  bool _isReady = false; 
+
+  uint32_t _currentFileSizeBytes = 0; 
+  bool _fileLimitReached = false; 
+
+  void m_pushToBuffer(const char* csvLine); 
+
+public:
+
+  Datalogger(SDManager* sdManager);
+
+  esp_err_t begin ();
+
+  void setMaxFiles(uint16_t maxFiles);
+
+// caso especifico de almacenar datos en formato CSV
+// El timestamp de newCSVLogSesion tiene que estar actualizado con rigor
+  esp_err_t newCSVLogSesion(const char * current_timestamp, const char** titles, uint16_t numTitles);
+
+  // En el mensaje de datos enviado el mensaje de timestamp lo pone el usuario..
+  esp_err_t appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues); 
+
+  esp_err_t appendErrorLog(const char* timestamp_msg, const char* err_message);
+
+  bool flushBuffer();
+
+  bool isFileLimitReached() const { return _fileLimitReached;}
+
+  //void clearFileLimit() {_fileLimitReached = false; }
+};
+
+#endif
+
+
+
 //#ifndef DATALOGGER_H
 //#define DATALOGGER_H
 //

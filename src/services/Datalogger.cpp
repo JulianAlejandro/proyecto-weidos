@@ -1,3 +1,255 @@
+#include "Datalogger.h"
+
+Datalogger::Datalogger(SDManager* sdManager) 
+    : _sd(sdManager), _fileManager(sdManager, MAX_LOGS) {
+    
+    // El cuerpo del constructor puede quedar vacío o para otras lógicas
+}
+
+
+esp_err_t Datalogger::begin() {
+    if (_sd == nullptr || !_sd->isReady()) {
+        return ESP_ERR_SD_NOT_INIT;
+    }
+
+    // 1. Inicializamos el gestor de archivos interno
+    esp_err_t err = _fileManager.begin();
+    if (err != ESP_OK) return err; 
+
+    // 2. Escaneamos la SD para recuperar el último entorno de trabajo
+    err = _fileManager.setCSVLastEnvironment(true); 
+    if (err != ESP_OK) return err; 
+
+    char * currentLogPtr = _fileManager.getCurrentLogPath();
+    
+    // 3. PROTECCIÓN: Verificar si se detectó un archivo existente del pasado
+    if (currentLogPtr != nullptr && currentLogPtr[0] != '\0') {
+        strncpy(_logPath, currentLogPtr, sizeof(_logPath) - 1);
+        _logPath[sizeof(_logPath) - 1] = '\0'; 
+
+        _fileLimitReached = false;
+
+        // =========================================================================
+        // SOLUCIÓN: Consultamos el tamaño real del archivo existente en la SD
+        // =========================================================================
+        uint32_t sizeFile = 0; 
+        err = _sd->getFileSize(_logPath, &sizeFile);
+        
+        if (err == ESP_OK) {
+            _currentFileSizeBytes = sizeFile; // Recuperamos los bytes exactos
+            if (_currentFileSizeBytes >= MAX_FILE_SIZE_BYTES) { _fileLimitReached = true;}
+            
+            Serial.print("[INFO] [DATALOGGER] Recuperado archivo previo. Tamaño: ");
+            Serial.print(_currentFileSizeBytes); Serial.println(" bytes.");
+        } else {
+            // Si por algún motivo falla la lectura, por seguridad partimos de 0
+            _currentFileSizeBytes = 0; 
+            Serial.print("[WARN] [DATALOGGER] No se pudo leer el tamaño del archivo previo. Seteado a 0.");
+        }
+
+    } else {
+        // CASO: No había archivos en la SD (carpeta vacía limpia)
+        _logPath[0] = '\0';
+        _currentFileSizeBytes = 0;
+        _fileLimitReached = false;
+        Serial.println("[INFO] [DATALOGGER] Entorno inicializado vacío (sin logs previos).");
+    }
+
+    // 4. Si llegamos hasta aquí con éxito, el sistema está listo para operar
+    _isReady = true; // TODO ANALIZAR SI ES NECESARIO ESTA VARIABLE 
+    _initialized = true;
+    return ESP_OK;
+}
+
+// todo pensar en como hacer esto mas flexible para que no sea solo CSV. 
+
+esp_err_t Datalogger::newCSVLogSesion(const char * current_timestamp, const char** titles, uint16_t numTitles){
+    // PROTECCIÓN: Si el datalogger no se inicializó bien o los títulos son nulos, aborta
+    if (!_initialized || titles == nullptr || numTitles == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (_buffer.getCurrentSize() > 0 && _logPath[0] != '\0') {
+        ///Serial.print("[INFO] ["); Serial.print(TAG_DFM); Serial.println("] Vaciando buffer del archivo saliente...");
+        flushBuffer();
+    }
+
+    esp_err_t err = _fileManager.newFileLog(current_timestamp); 
+    if (err != ESP_OK){
+        //_logPath = nullptr; // importante que no salga ninguna informacion que pueda corromper
+        return err;
+    }
+    char * currentLogPtr = _fileManager.getCurrentLogPath();
+    // PROTECCIÓN: Verificar que el gestor de archivos devolvió una ruta válida
+    if (currentLogPtr != nullptr && currentLogPtr[0] != '\0') {
+        strncpy(_logPath, currentLogPtr, sizeof(_logPath) - 1);
+        _logPath[sizeof(_logPath) - 1] = '\0'; 
+
+        _currentFileSizeBytes = 0;
+        _fileLimitReached = false;// pensar , tengo el problema de que al establecer una sesion, me falta informacion de tamaño....
+    } else {
+        _logPath[0] = '\0';
+        return ESP_FAIL; 
+    }
+
+    // armamos la linea de titulos y la enviamos 
+    char tempLine[256] = "Timestamp;"; 
+
+    for (uint16_t i = 0; i < numTitles; i++) {
+        if (titles[i] != nullptr) {
+            strncat(tempLine, titles[i], sizeof(tempLine) - strlen(tempLine) - 1);
+        }
+        // Añadimos el separador ";" entre los títulos del usuario
+        if (i < numTitles - 1) {
+            strncat(tempLine, ";", sizeof(tempLine) - strlen(tempLine) - 1);
+        }
+    }
+    // Añadimos el salto de línea al final de toda la cabecera
+    strncat(tempLine, "\n", sizeof(tempLine) - strlen(tempLine) - 1); 
+
+    // Enviamos la cabecera armada al búfer de RAM
+    m_pushToBuffer(tempLine);
+
+    _isReady = true; 
+    return ESP_OK;
+}
+
+/*
+esp_err_t Datalogger::newCSVLogSesion(const char * timestamp, const char** titles, uint16_t numTitles){
+
+// hacer un filtro del timestamp.....tiene que cumplir con unas condiciones 
+  _fileManager.newFileLog(timestamp); // un log generico. 
+
+// copia segura de los datos en _logPath
+  char * currentLogPtr = _fileManager.getCurrentLog();
+  if (currentLogPtr != nullptr && currentLogPtr[0] != '\0') {
+        strncpy(_logPath, currentLogPtr, sizeof(_logPath) - 1);
+        _logPath[sizeof(_logPath) - 1] = '\0'; // Asegurar el terminador nulo
+  } else {
+        _logPath[0] = '\0';
+  }
+
+   // obtencion de array de titulos en FORMATO CSV para pasarlos al buffer 
+
+  char tempLine[256] = ""; // Búfer temporal para armar la línea del encabezado
+
+  for (uint16_t i = 0; i < numTitles; i++) {
+    if (titles[i] != nullptr) {
+        strncat(tempLine, titles[i], sizeof(tempLine) - strlen(tempLine) - 1);
+    }
+    if (i < numTitles - 1) {
+        strncat(tempLine, ";", sizeof(tempLine) - strlen(tempLine) - 1);
+      }
+  }
+  strncat(tempLine, "\n", sizeof(tempLine) - strlen(tempLine) - 1); // Salto de línea CSV
+
+    // Enviamos la línea armada al gestor del búfer
+    //TODO AHORA ESTO SE HACE EXTERNAMENTE A LA CLASE
+  m_pushToBuffer(tempLine);
+    //borrar solo es prueba: 
+    //_buffer.dumpToSerial();
+  
+}
+*/
+
+void Datalogger::setMaxFiles(uint16_t maxFiles){
+    _fileManager.setMaxFiles(maxFiles);
+}
+
+esp_err_t Datalogger::appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues){
+    if(!_isReady){
+        Serial.println("es aqui"); 
+        return ESP_FAIL;
+    }
+    if (_logPath[0] == '\0') return ESP_FAIL;
+
+    char tempLine[512]; // Ajusta el tamaño según la longitud máxima estimada de tus filas
+    snprintf(tempLine, sizeof(tempLine), "%s", timestamp_msg);
+
+    for (uint16_t i = 0; i < numValues; i++) {
+        strncat(tempLine, ";", sizeof(tempLine) - strlen(tempLine) - 1);
+        if (values[i] != nullptr) {
+            strncat(tempLine, values[i], sizeof(tempLine) - strlen(tempLine) - 1);
+        }
+    }
+    strncat(tempLine, "\n", sizeof(tempLine) - strlen(tempLine) - 1); // Salto de línea CSV
+
+    // Enviamos la fila armada al gestor del búfer
+    //todo ahora esto se hace externamente a la clase 
+    m_pushToBuffer(tempLine);
+    //_buffer.dumpToSerial();
+    return ESP_OK;
+
+}
+
+
+void flushLogBufferCallback(Stream& stream, void* context) {
+    LogBuffer* buffer = (LogBuffer*)context;
+    // Escribe todos los bytes acumulados de golpe
+    stream.write(buffer->getBufferPointer(), buffer->getCurrentSize());
+}
+
+bool Datalogger::flushBuffer() {
+    // Si el búfer está vacío, no perdemos tiempo abriendo la SD
+    if (_buffer.getCurrentSize() == 0 || _logPath[0] == '\0') {
+        return true;
+    }
+
+    size_t bytesToWrite = _buffer.getCurrentSize();
+    ESP_LOGI("DATALOGGER", "Vaciando %d bytes del búfer a la SD...", bytesToWrite);
+    
+    // Abrimos el archivo una única vez para volcar el bloque entero
+    bool success = !_sd->withFileWrite(_logPath, flushLogBufferCallback, &_buffer);
+    
+    if (success) {
+        _currentFileSizeBytes += bytesToWrite;
+        _buffer.clear(); // Reseteamos el búfer si se escribió correctamente
+    }
+    Serial.println("volcando a SD..."); 
+    return success;
+}
+
+void Datalogger::m_pushToBuffer(const char* csvLine) {
+
+    if(_fileLimitReached){
+        return; 
+    }
+
+    size_t lineLength = strlen(csvLine);
+
+    uint32_t projectedSize = _currentFileSizeBytes + _buffer.getCurrentSize() + lineLength;
+
+    if (projectedSize > MAX_FILE_SIZE_BYTES) {
+        Serial.print("[WARN] [DATALOGGER] ¡Límite de 20MB próximo! Forzando último volcado y bloqueando envío.");
+        
+        // 1. Volcamos lo que actualmente hay en el buffer antes de que se pase del límite
+        flushBuffer();
+        
+        // 2. Activamos el flag de bloqueo
+        _fileLimitReached = true;
+        
+        // 3. Salimos sin meter la nueva línea (evita corrupción o sobrepasar el límite)
+        return; 
+    }
+
+    // Si la línea actual no cabe en lo que queda de búfer, primero vaciamos la RAM a la SD
+    if (lineLength > _buffer.getAvailableSpace()) {
+        flushBuffer();
+    }
+
+    // Guardamos la línea en el búfer de forma segura
+    _buffer.appendString(csvLine);
+}
+
+esp_err_t Datalogger::appendErrorLog(const char* timestamp_msg, const char* err_message){
+
+  esp_err_t err; 
+  err = _fileManager.appendErrorLog(timestamp_msg, err_message); 
+  return err; 
+
+}
+
+
 //#include "Datalogger.h"
 //#include <esp_err.h>
 //

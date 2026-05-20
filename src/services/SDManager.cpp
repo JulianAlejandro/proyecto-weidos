@@ -200,3 +200,40 @@ esp_err_t SDManager::listDirectory(const char* dirPath, FileIterationCallback ca
     root.close();
     return ESP_OK;
 }
+
+
+/**
+ * @brief Obtiene el tamaño de un archivo en bytes de forma segura.
+ */
+esp_err_t SDManager::getFileSize(const char* path, uint32_t* outSize) {
+    // 1. Validación de inicialización de la tarjeta
+    if (!_initialized) return ESP_ERR_SD_NOT_INIT;
+
+    // 2. Validación de punteros de salida seguros
+    if (path == nullptr || outSize == nullptr) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // 3. Comprobar si el archivo físico existe en la SD
+    if (!SD.exists(path)) {
+        *outSize = 0; // Inicialización de seguridad en caso de fallo
+        ESP_LOGW(TAG, "No se puede obtener tamaño. El archivo no existe: %s", path);
+        return ESP_ERR_SD_FILE_NOT_FOUND;
+    }
+
+    // 4. Abrir el archivo en modo Lectura
+    File file = SD.open(path, FILE_READ);
+    if (!file) {
+        *outSize = 0;
+        ESP_LOGE(TAG, "Fallo al abrir archivo para verificar tamaño: %s", path);
+        return ESP_ERR_SD_WRITE_FAIL; // O un error genérico de acceso a la SD
+    }
+
+    // 5. Extraer el tamaño usando el método nativo del objeto File
+    *outSize = file.size();
+
+    // 6. Cerrar el archivo inmediatamente para liberar recursos de hardware
+    file.close();
+
+    return ESP_OK;
+}

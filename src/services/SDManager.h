@@ -100,6 +100,8 @@ public:
     esp_err_t deleteFile(const char* path);
 
     esp_err_t listDirectory(const char* dirPath, FileIterationCallback callback, void* context);
+
+    esp_err_t getFileSize(const char* path, uint32_t* outSize);
 };
 
 #endif

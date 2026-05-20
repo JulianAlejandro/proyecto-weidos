@@ -1,12 +1,11 @@
-
+/*
 #include "src/services/SDManager.h"
-#include "src/services/DataloggerFileManager.h"
+#include "src/services/Datalogger.h"
 #include <RTClib.h>
 
 SDManager sd;  
-DataloggerFileManager DatManager(&sd,4); 
+Datalogger datalogger(&sd);
 RTC_DS3231 rtc;
-
 
 void check_critical_error(esp_err_t err, const char* msg) {
     if (err != ESP_OK) {
@@ -20,9 +19,13 @@ void check_critical_error(esp_err_t err, const char* msg) {
     }
 }
 
+void function(RTC_DS3231& rtc, Datalogger& datalogger);
+
 void setup() {
     Serial.begin(115200);
     delay(1000);
+
+    Serial.println("Señales de vida: ");
 
     esp_err_t err;
 
@@ -35,22 +38,28 @@ void setup() {
     }
 
     // 2. Inicializar Gestor de Datalogger
-    err = DatManager.begin(); 
+    err = datalogger.begin(); 
     check_critical_error(err, "Error datalogger");
 
     // Indexa los archivos existentes y borra los que superen el límite configurado (4)
-    DatManager.setCSVLastEnvironment(true);
+    //err = datalogger.setCSVLastEnvironment(true);
+    //check_critical_error(err, "Error Set CSV environment");
 
     // 3. Obtener hora actual para el NOMBRE del nuevo archivo de sesión
-    
+    rtc.adjust(DateTime(2026, 12, 27, 15, 56, 1));
+
+
+
     DateTime ahora = rtc.now();
     char nombreFichero[16]; 
     // Formato exacto requerido: MMDDHHmm (Ej: 06271240)
-    snprintf(nombreFichero, sizeof(nombreFichero), "%02d%02d%02d%02d", 
-            ahora.month(), 
-            ahora.day(), 
-            ahora.hour(),
-            ahora.minute());
+    snprintf(nombreFichero, sizeof(nombreFichero), "%02d%02d%02d%02d%02d%02d", 
+        ahora.year(), // Extrae los últimos dos dígitos del año (ej: 2026 -> 26)
+        ahora.month(), 
+        ahora.day(), 
+        ahora.hour(),
+        ahora.minute(),
+        ahora.second());
 
     // ==========================================
     // SIMULACIÓN: DEFINICIÓN DE CABECERAS (TITLES)
@@ -59,55 +68,70 @@ void setup() {
     uint16_t numColumnas = sizeof(misCabeceras) / sizeof(misCabeceras[0]);
 
     // Creamos la nueva sesión pasándole el nombre/timestamp y los títulos
-    Serial.print("[SIM] Creando nueva sesion de log: "); Serial.println(nombreFichero);
-    err = DatManager.newCSVLogSesion(nombreFichero, misCabeceras, numColumnas);
-    check_critical_error(err, "Error al crear nueva sesion CSV");
+    
 
-    // ==========================================
-    // SIMULACIÓN: ENTRADA DE DATOS SUCESIVOS
-    // ==========================================
+    Serial.print("[SIM] Creando nueva sesion de log: "); Serial.println(nombreFichero);
+    err = datalogger.newCSVLogSesion(nombreFichero, misCabeceras, numColumnas);
+    if(err != ESP_OK){return; }
+
+
+    //DateTime ahora = rtc.now();
+    //char timestampLectura[32];
+    //snprintf(timestampLectura, sizeof(timestampLectura), "%04d/%02d/%02d %02d:%02d:%02d", 
+    //         ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
+//
+    //datalogger.appendErrorLog(timestampLectura, "error de pruebabababab");
+
+}
+
+
+void loop(){
+
+    function(rtc, datalogger);
+    delay(1000); 
+}
+
+void function(RTC_DS3231& rtc, Datalogger& datalogger){
+    esp_err_t err;
+    uint16_t numColumnas = 3; 
+    DateTime ahora = rtc.now();
     char timestampLectura[32];
     
-    // --- LECTURA 1 ---
     ahora = rtc.now(); // Actualizamos marca de tiempo para la fila de datos
     snprintf(timestampLectura, sizeof(timestampLectura), "%04d/%02d/%02d %02d:%02d:%02d", 
              ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
     
     const char* valores1[] = {"24.5", "60.2", "1013.2"};
     Serial.println("[SIM] Insertando Lectura 1...");
-    DatManager.appendNewDataCSVToLog(timestampLectura, valores1, numColumnas);
-    delay(1000); 
+    err = datalogger.appendNewDataCSVToLog(timestampLectura, valores1, numColumnas);
 
-    // --- LECTURA 2 ---
-    ahora = rtc.now();
-    snprintf(timestampLectura, sizeof(timestampLectura), "%04d/%02d/%02d %02d:%02d:%02d", 
-             ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
-             
-    const char* valores2[] = {"24.6", "59.8", "1013.1"};
-    Serial.println("[SIM] Insertando Lectura 2...");
-    DatManager.appendNewDataCSVToLog(timestampLectura, valores2, numColumnas);
-    delay(1000); 
+    if(datalogger.isFileLimitReached()){
+        Serial.println("El limite superado....se abre otra sesion");
+        const char* misCabeceras[] = {"TEMP", "HUM", "PRESION"};
+        //uint16_t numColumnas = sizeof(misCabeceras) / sizeof(misCabeceras[0]);
 
-    // --- LECTURA 3 ---
-    ahora = rtc.now();
-    snprintf(timestampLectura, sizeof(timestampLectura), "%04d/%02d/%02d %02d:%02d:%02d", 
-             ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
-             
-    const char* valores3[] = {"24.8", "59.5", "1012.9"};
-    Serial.println("[SIM] Insertando Lectura 3...");
-    DatManager.appendNewDataCSVToLog(timestampLectura, valores3, numColumnas);
-    delay(1000); 
+       
+         char nombreFichero[16]; 
+        // Formato exacto requerido: MMDDHHmm (Ej: 06271240)
+        snprintf(nombreFichero, sizeof(nombreFichero), "%02d%02d%02d%02d%02d%02d", 
+        ahora.year(), // Extrae los últimos dos dígitos del año (ej: 2026 -> 26)
+        ahora.month(), 
+        ahora.day(), 
+        ahora.hour(),
+        ahora.minute(),
+        ahora.second());
 
-    // 4. Forzar el volcado del buffer a la SD físico al terminar el lote
-    Serial.println("[SIM] Volcando buffer a la tarjeta SD...");
-    DatManager.flushBuffer();
-    
+        Serial.print("[SIM] Creando nueva sesion de log: "); Serial.println(nombreFichero);
+        err = datalogger.newCSVLogSesion(nombreFichero, misCabeceras, numColumnas);
+        if(err != ESP_OK){return; }
+    }
+
+    if(err != ESP_OK){
+        Serial.println("error dentro del loop"); 
+    }
+
 }
-
-void loop(){
-    delay(1000);
-}
-
+*/
 
 /*
 #include <RTClib.h>
@@ -116,7 +140,7 @@ void loop(){
 
 
 SDManager sd;  
-DataloggerFileManager DatManager(&sd,4); 
+DataloggerFileManager datalogger(&sd,4); 
 RTC_DS3231 rtc;
 
 
@@ -146,10 +170,10 @@ void setup(){
     check_critical_error(ESP_FAIL, "Hardware RTC DS3231 no encontrado");
     }
 
-    err = DatManager.begin(); 
+    err = datalogger.begin(); 
     check_critical_error(err, "Error datalogger");
 
-    DatManager.setCSVLastEnvironment(true);
+    datalogger.setCSVLastEnvironment(true);
 
 
 
@@ -161,7 +185,7 @@ void loop(){
 
 */
 
-/*
+
 
 #include <RTClib.h>
 
@@ -185,7 +209,7 @@ void loop(){
 // Global Instances
 RTC_DS3231 rtc;
 SDManager sd;  
-Datalogger datalogger(&sd,30); //30 ficheros por defecto
+Datalogger datalogger(&sd); //30 ficheros por defecto
 EnergyMeterRegInterpreter regInterpreter(&sd); 
 EnergyMeter750 energy_meter; 
 ModbusRequestCSV mb_csv(&sd);
@@ -271,6 +295,7 @@ void setup() {
     err = regInterpreter.prepareAdvanceDatalogger(req, &datalogger, &rtc);
     check_critical_error(err, "No se pudo iniciar la sesion de Datalogging");
 
+    rtc.adjust(DateTime(2026, 05, 20, 16, 11, 3));
     Serial.println("--- SISTEMA LISTO Y CORRIENDO ---\n");
 }
 
@@ -283,4 +308,4 @@ void loop() {
     // El delay es pequeño para mantener la responsividad
     delay(1000); 
 }
-*/
+
