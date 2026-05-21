@@ -96,6 +96,8 @@ public:
      * * virtual void setConfig(void* configData) = 0; 
      * This allows runtime configuration updates (IP/Baudrate) via JSON or structs.
      */
+
+     
 };
 
 #endif

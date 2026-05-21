@@ -1,5 +1,5 @@
 #include "EnergyMeter750.h"
-#include "../../Debug.h"
+#include "../Debug.h"
 
 EnergyMeter750::EnergyMeter750() {}
 

@@ -1,7 +1,13 @@
 #include "ModbusTCPManager.h"
-#include "../../Debug.h"
+#include "../Debug.h"
 
 static const char* TAG = "MB_TCP_MGR";
+
+
+
+ModbusTCPManager::~ModbusTCPManager() {
+    stop();
+}
 
 /**
  * @brief Gestión de reconexión con reporte de estado detallado.
@@ -77,6 +83,7 @@ esp_err_t ModbusTCPManager::readCoils(int address, int quantity) {
     if (status != ESP_OK) return status;
 
     if (!_modbusClient.requestFrom(_slaveID, COILS, address, quantity)) {
+        _modbusClient.stop();
         return ESP_ERR_MODBUS_TIMEOUT;
     }
     return ESP_OK;
@@ -133,4 +140,17 @@ esp_err_t ModbusTCPManager::requestFrom(int slaveAddress, int type, uint16_t add
         return ESP_ERR_MODBUS_TIMEOUT;
     }
     return ESP_OK;
+}
+
+/**
+ * @brief Cierra de forma ordenada la sesión Modbus y libera el socket TCP.
+ */
+void ModbusTCPManager::stop() {
+    // Si el cliente está conectado, enviamos el cierre formal TCP (Handshake FIN/ACK)
+    if (_modbusClient.connected()) {
+        MY_LOGI(TAG, "Cerrando conexión activa con servidor Modbus TCP de forma limpia...");
+    }
+    
+    _modbusClient.stop(); // Detiene el wrapper de Modbus
+    _ethClient.stop();    // Asegura la liberación del socket físico en el chip W5500/ENC28J60
 }

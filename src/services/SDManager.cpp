@@ -1,13 +1,17 @@
 #include "SDManager.h"
 #include <SPI.h>
 
-#include "../../Debug.h"
+#include "../Debug.h"
 
 const char* SDManager::TAG = "SD_MGR";
 /**
  * @brief Default constructor.
  */
 SDManager::SDManager() {}
+
+SDManager::~SDManager() {
+    end(); 
+}
 
 /**
  * @brief Starts the SD card hardware communication.
@@ -161,6 +165,7 @@ esp_err_t SDManager::withFileWrite(const char* path, StreamCallback callback, vo
     }
 
     callback(file, context);
+    file.flush();
     file.close();
     return ESP_OK;
 }
@@ -238,4 +243,12 @@ esp_err_t SDManager::getFileSize(const char* path, uint32_t* outSize) {
     file.close();
 
     return ESP_OK;
+}
+
+void SDManager::end() {
+    if (!_initialized) return;
+
+    SD.end(); // Libera los recursos del driver nativo y desmonta el volumen FAT
+    _initialized = false;
+    MY_LOGI(TAG, "Tarjeta SD desmontada y recursos liberados correctamente.");
 }

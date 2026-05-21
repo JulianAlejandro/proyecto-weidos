@@ -1,7 +1,7 @@
 #include "Datalogger.h"
 #include <cstring>
 #include <cstdio>
-#include "../../Debug.h"
+#include "../Debug.h"
 
 static const char* TAG = "DATALOGGER";
 

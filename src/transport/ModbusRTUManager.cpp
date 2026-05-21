@@ -1,5 +1,5 @@
 #include "ModbusRTUManager.h"
-#include "../../Debug.h"
+#include "../Debug.h"
 
 static const char* TAG = "MB_RTU_MGR";
 

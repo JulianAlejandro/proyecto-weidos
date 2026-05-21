@@ -38,8 +38,13 @@ class ModbusTCPManager : public ModbusTransport {
     ModbusTCPManager(IPAddress server, uint8_t slaveID = 1, uint16_t port = 502) 
       : _modbusClient(_ethClient), _serverIP(server), _port(port), _slaveID(slaveID) {}
 
-    // --- INTERFACE IMPLEMENTATION (VIRTUAL METHODS) ---
+    /**
+     * @brief Destructor para garantizar el cierre correcto del socket de red.
+     */
+    ~ModbusTCPManager() override;
 
+    // --- INTERFACE IMPLEMENTATION (VIRTUAL METHODS) ---
+    void stop();
     /**
      * @brief Standard initialization from interface.
      * @return true if communication with the server is established.

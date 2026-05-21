@@ -3,7 +3,7 @@
 #include "devices/EnergyMeter750.h"
 #include "services/Datalogger.h"
 #include <RTClib.h>
-#include "../Debug.h"
+#include "Debug.h"
 
 /**
  * @struct StreamContext

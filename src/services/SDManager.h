@@ -31,6 +31,7 @@ public:
      * @brief Constructor for SDManager.
      */
     SDManager();
+    ~SDManager(); // <-- Declaración del destructor
 
     /**
      * @brief Initializes the SD card using the default SPI bus.
@@ -102,6 +103,8 @@ public:
     esp_err_t listDirectory(const char* dirPath, FileIterationCallback callback, void* context);
 
     esp_err_t getFileSize(const char* path, uint32_t* outSize);
+
+    void end();
 };
 
 #endif

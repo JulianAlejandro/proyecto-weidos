@@ -1,6 +1,3 @@
-
-#include "Debug.h"
-
 #include <RTClib.h>
 
 // Transport Layer implementations
@@ -16,13 +13,15 @@
 #include "src/EnergyMeterRegInterpreter.h"
 #include "src/ModbusRequestCSV.h"
 
+#include "src/Debug.h"
+
 // Default Modbus Settings
 #define SLAVE_ADDRESS 1 
 #define MODBUS_PORT 502
 
 // Global Instances
 RTC_DS3231 rtc;
-SDManager sd;  
+SDManager sd; 
 Datalogger datalogger(&sd); //30 ficheros por defecto
 EnergyMeterRegInterpreter regInterpreter(&sd); 
 EnergyMeter750 energy_meter; 
@@ -31,23 +30,77 @@ ModbusTransport* modbus = nullptr; // Polymorphic pointer for TCP or RTU
 
 uint8_t g_my_log_current_level = MY_LOG_LEVEL_VERBOSE; 
 
+
 void check_critical_error(esp_err_t err, const char* msg) {
     if (err != ESP_OK) {
+        Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
+
+        if (sd.isReady()) {
+            // Aumentamos a 32 por seguridad para evitar truncamientos en el stack
+            char timestamp[128]; 
+            strcpy(timestamp, "SYSTEM_PANIC");
+            
+            //DateTime now(2026, 5, 21, 13, 19, 1); // = rtc.now();
+            DateTime now = rtc.now();
+            if (now.year() >= 2026) { 
+                snprintf(timestamp, sizeof(timestamp), "%04d-%02d-%02d %02d:%02d:%02d", 
+                         now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+            }
+            Serial.print("Esto es: ");
+            Serial.println(timestamp);
+
+            char err_payload[128];
+            snprintf(err_payload, sizeof(err_payload), "%s (Cod: 0x%X)", msg, err);
+
+            Serial.println("Escribiendo reporte de fallo en la SD...");
+            datalogger.appendErrorLog(timestamp, err_payload);
+            
+            //datalogger.flushBuffer();
+        } else {
+            Serial.println("[AVISO] SD no lista. Imposible guardar el reporte.");
+        }
+
+        sd.end(); 
+        while(true); 
+        Serial.println("Reiniciando sistema en 5 segundos...");
+        delay(5000); 
+        ESP.restart(); 
+    }
+}
+
+/*
+void check_critical_error(esp_err_t err, const char* msg) {
+    if (err != ESP_OK) {
+
+        
         Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
         Serial.println("Reiniciando sistema en 5 segundos...");
         
         delay(5000); // Tiempo para que el usuario pueda leer el error en el monitor
+
+        //datalogger.appendErrorLog(const char *timestamp_msg, const char *err_message);
+
+        sd.end(); 
+
         while(true); 
         
         ESP.restart(); // <--- Aquí generas el reset por código
     }
 }
+*/
 
 void setup() {
+
     Serial.begin(115200);
     while(!Serial); 
     
-    my_log_level_set(MY_LOG_LEVEL_ERROR); // imponemos un nivel de log de error 
+    my_log_level_set(MY_LOG_LEVEL_VERBOSE); // imponemos un nivel de log de error 
+
+   
+    if (!rtc.begin()) {
+        Serial.println("En esta aplicacion el RTC es vital..."); 
+        while(true);
+    }
 
     esp_err_t err;
 
@@ -59,10 +112,6 @@ void setup() {
     err = datalogger.begin();
     check_critical_error(err, "Directorio /LOGS no accesible o Datalogger no inicializado");
 
-    if (!rtc.begin()) {
-        check_critical_error(ESP_FAIL, "Hardware RTC DS3231 no encontrado");
-    }
-
     // 3. Configuración: Carga de Mapas y Peticiones desde SD
     err = regInterpreter.begin();
     check_critical_error(err, "Fallo al leer Mapa de Registros (EM750map.csv)");
@@ -70,11 +119,8 @@ void setup() {
     err = mb_csv.begin();
     check_critical_error(err, "Fallo al acceder a configuración (MBReq.csv)");
 
-    if(mb_csv.loadFromSDParameters() == ESP_OK) {
-       // Serial.printf("Dispositivo: %s | Servidor: %s\n", mb_csv.getDeviceName(), mb_csv.getIpAdress());
-    } else {
-       // Serial.println("Aviso: Usando parámetros de conexión por defecto.");
-    }
+    err = mb_csv.loadFromSDParameters();
+    check_critical_error(err, "Fallo al obtener el modbus request"); 
 
     // 4. Capa de Transporte: Conexión Modbus
     Struct_MBRequest req;  
@@ -108,9 +154,6 @@ void setup() {
     err = regInterpreter.prepareAdvanceDatalogger(req, &datalogger, &rtc);
     check_critical_error(err, "No se pudo iniciar la sesión de Datalogging");
 
-    rtc.adjust(DateTime(2026, 5, 21, 13, 13, 1));
-
-    //Serial.println("--- SISTEMA LISTO Y CORRIENDO ---\n");
 }
 
 void loop() {
