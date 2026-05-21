@@ -1,191 +1,5 @@
-/*
-#include "src/services/SDManager.h"
-#include "src/services/Datalogger.h"
-#include <RTClib.h>
 
-SDManager sd;  
-Datalogger datalogger(&sd);
-RTC_DS3231 rtc;
-
-void check_critical_error(esp_err_t err, const char* msg) {
-    if (err != ESP_OK) {
-        Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
-        Serial.println("Reiniciando sistema en 5 segundos...");
-        
-        delay(5000); // Tiempo para que el usuario pueda leer el error en el monitor
-        while(true); 
-        
-        //ESP.restart(); // <--- Aquí generas el reset por código
-    }
-}
-
-void function(RTC_DS3231& rtc, Datalogger& datalogger);
-
-void setup() {
-    Serial.begin(115200);
-    delay(1000);
-
-    Serial.println("Señales de vida: ");
-
-    esp_err_t err;
-
-    // 1. Hardware Base: Tarjeta SD y RTC
-    err = sd.begin();
-    check_critical_error(err, "Fallo en Hardware SD");
-
-    if (!rtc.begin()) {
-        check_critical_error(ESP_FAIL, "Hardware RTC DS3231 no encontrado");
-    }
-
-    // 2. Inicializar Gestor de Datalogger
-    err = datalogger.begin(); 
-    check_critical_error(err, "Error datalogger");
-
-    // Indexa los archivos existentes y borra los que superen el límite configurado (4)
-    //err = datalogger.setCSVLastEnvironment(true);
-    //check_critical_error(err, "Error Set CSV environment");
-
-    // 3. Obtener hora actual para el NOMBRE del nuevo archivo de sesión
-    rtc.adjust(DateTime(2026, 12, 27, 15, 56, 1));
-
-
-
-    DateTime ahora = rtc.now();
-    char nombreFichero[16]; 
-    // Formato exacto requerido: MMDDHHmm (Ej: 06271240)
-    snprintf(nombreFichero, sizeof(nombreFichero), "%02d%02d%02d%02d%02d%02d", 
-        ahora.year(), // Extrae los últimos dos dígitos del año (ej: 2026 -> 26)
-        ahora.month(), 
-        ahora.day(), 
-        ahora.hour(),
-        ahora.minute(),
-        ahora.second());
-
-    // ==========================================
-    // SIMULACIÓN: DEFINICIÓN DE CABECERAS (TITLES)
-    // ==========================================
-    const char* misCabeceras[] = {"TEMP", "HUM", "PRESION"};
-    uint16_t numColumnas = sizeof(misCabeceras) / sizeof(misCabeceras[0]);
-
-    // Creamos la nueva sesión pasándole el nombre/timestamp y los títulos
-    
-
-    Serial.print("[SIM] Creando nueva sesion de log: "); Serial.println(nombreFichero);
-    err = datalogger.newCSVLogSesion(nombreFichero, misCabeceras, numColumnas);
-    if(err != ESP_OK){return; }
-
-
-    //DateTime ahora = rtc.now();
-    //char timestampLectura[32];
-    //snprintf(timestampLectura, sizeof(timestampLectura), "%04d/%02d/%02d %02d:%02d:%02d", 
-    //         ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
-//
-    //datalogger.appendErrorLog(timestampLectura, "error de pruebabababab");
-
-}
-
-
-void loop(){
-
-    function(rtc, datalogger);
-    delay(1000); 
-}
-
-void function(RTC_DS3231& rtc, Datalogger& datalogger){
-    esp_err_t err;
-    uint16_t numColumnas = 3; 
-    DateTime ahora = rtc.now();
-    char timestampLectura[32];
-    
-    ahora = rtc.now(); // Actualizamos marca de tiempo para la fila de datos
-    snprintf(timestampLectura, sizeof(timestampLectura), "%04d/%02d/%02d %02d:%02d:%02d", 
-             ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
-    
-    const char* valores1[] = {"24.5", "60.2", "1013.2"};
-    Serial.println("[SIM] Insertando Lectura 1...");
-    err = datalogger.appendNewDataCSVToLog(timestampLectura, valores1, numColumnas);
-
-    if(datalogger.isFileLimitReached()){
-        Serial.println("El limite superado....se abre otra sesion");
-        const char* misCabeceras[] = {"TEMP", "HUM", "PRESION"};
-        //uint16_t numColumnas = sizeof(misCabeceras) / sizeof(misCabeceras[0]);
-
-       
-         char nombreFichero[16]; 
-        // Formato exacto requerido: MMDDHHmm (Ej: 06271240)
-        snprintf(nombreFichero, sizeof(nombreFichero), "%02d%02d%02d%02d%02d%02d", 
-        ahora.year(), // Extrae los últimos dos dígitos del año (ej: 2026 -> 26)
-        ahora.month(), 
-        ahora.day(), 
-        ahora.hour(),
-        ahora.minute(),
-        ahora.second());
-
-        Serial.print("[SIM] Creando nueva sesion de log: "); Serial.println(nombreFichero);
-        err = datalogger.newCSVLogSesion(nombreFichero, misCabeceras, numColumnas);
-        if(err != ESP_OK){return; }
-    }
-
-    if(err != ESP_OK){
-        Serial.println("error dentro del loop"); 
-    }
-
-}
-*/
-
-/*
-#include <RTClib.h>
-#include "src/services/SDManager.h"
-#include "src/services/DataloggerFileManager.h"
-
-
-SDManager sd;  
-DataloggerFileManager datalogger(&sd,4); 
-RTC_DS3231 rtc;
-
-
-void check_critical_error(esp_err_t err, const char* msg) {
-    if (err != ESP_OK) {
-        Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
-        Serial.println("Reiniciando sistema en 5 segundos...");
-        
-        delay(5000); // Tiempo para que el usuario pueda leer el error en el monitor
-        while(true); 
-        
-        //ESP.restart(); // <--- Aquí generas el reset por código
-    }
-}
-
-void setup(){
-     Serial.begin(115200);
-     delay(1000);
-
-    esp_err_t err;
-
-    // 1. Hardware Base: Tarjeta SD
-    err = sd.begin();
-    check_critical_error(err, "Fallo en Hardware SD");
-
-    if (!rtc.begin()) {
-    check_critical_error(ESP_FAIL, "Hardware RTC DS3231 no encontrado");
-    }
-
-    err = datalogger.begin(); 
-    check_critical_error(err, "Error datalogger");
-
-    datalogger.setCSVLastEnvironment(true);
-
-
-
-}
-
-void loop(){
-    delay(1000);
-}
-
-*/
-
-
+#include "Debug.h"
 
 #include <RTClib.h>
 
@@ -215,6 +29,8 @@ EnergyMeter750 energy_meter;
 ModbusRequestCSV mb_csv(&sd);
 ModbusTransport* modbus = nullptr; // Polymorphic pointer for TCP or RTU
 
+uint8_t g_my_log_current_level = MY_LOG_LEVEL_VERBOSE; 
+
 void check_critical_error(esp_err_t err, const char* msg) {
     if (err != ESP_OK) {
         Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
@@ -229,8 +45,9 @@ void check_critical_error(esp_err_t err, const char* msg) {
 
 void setup() {
     Serial.begin(115200);
-    while(!Serial); // Esperar a la consola en MKR/ESP32-S3
-    Serial.println("\n--- WEIDOS SYSTEM STARTUP ---");
+    while(!Serial); 
+    
+    my_log_level_set(MY_LOG_LEVEL_ERROR); // imponemos un nivel de log de error 
 
     esp_err_t err;
 
@@ -238,10 +55,9 @@ void setup() {
     err = sd.begin();
     check_critical_error(err, "Fallo en Hardware SD");
 
-    // 2. Servicios: Datalogger y RTC
-    if(datalogger.begin()) {
-        check_critical_error(ESP_FAIL, "Directorio /LOGS no accesible");
-    }
+    // 2. Servicios: Datalogger (CORREGIDO: Ahora propaga y evalúa correctamente el código err)
+    err = datalogger.begin();
+    check_critical_error(err, "Directorio /LOGS no accesible o Datalogger no inicializado");
 
     if (!rtc.begin()) {
         check_critical_error(ESP_FAIL, "Hardware RTC DS3231 no encontrado");
@@ -252,22 +68,19 @@ void setup() {
     check_critical_error(err, "Fallo al leer Mapa de Registros (EM750map.csv)");
 
     err = mb_csv.begin();
-    check_critical_error(err, "Fallo al acceder a configuracion (MBReq.csv)");
+    check_critical_error(err, "Fallo al acceder a configuración (MBReq.csv)");
 
-    // Intentamos cargar parámetros (no crítico, usamos valores por defecto si falla)
     if(mb_csv.loadFromSDParameters() == ESP_OK) {
-        Serial.printf("Dispositivo: %s | Servidor: %s\n", mb_csv.getDeviceName(), mb_csv.getIpAdress());
+       // Serial.printf("Dispositivo: %s | Servidor: %s\n", mb_csv.getDeviceName(), mb_csv.getIpAdress());
     } else {
-        Serial.println("Aviso: Usando parámetros de conexión por defecto.");
+       // Serial.println("Aviso: Usando parámetros de conexión por defecto.");
     }
 
     // 4. Capa de Transporte: Conexión Modbus
     Struct_MBRequest req;  
     err = mb_csv.loadFromSDMbrequest(&req);
-    check_critical_error(err, "Peticion Modbus invalida en CSV");
+    check_critical_error(err, "Petición Modbus inválida en CSV");
 
-    // Selección de transporte (TCP/RTU)
-    // En el futuro, este 'true' vendrá de un parámetro en el CSV
     bool useTCP = true; 
 
     if(useTCP) {
@@ -280,7 +93,7 @@ void setup() {
             tcp->begin(mac, local_ip);
             modbus = tcp;
         } else {
-            check_critical_error(ESP_ERR_CONFIG_INVALID_DATA, "IP del Servidor invalida");
+            check_critical_error(ESP_ERR_CONFIG_INVALID_DATA, "IP del Servidor inválida");
         }
     } else {
         ModbusRTUManager* rtu = new ModbusRTUManager(19200, 1, SERIAL_8E1);
@@ -293,10 +106,11 @@ void setup() {
     check_critical_error(err, "Error al vincular Driver EM750");
 
     err = regInterpreter.prepareAdvanceDatalogger(req, &datalogger, &rtc);
-    check_critical_error(err, "No se pudo iniciar la sesion de Datalogging");
+    check_critical_error(err, "No se pudo iniciar la sesión de Datalogging");
 
-    rtc.adjust(DateTime(2026, 05, 20, 16, 11, 3));
-    Serial.println("--- SISTEMA LISTO Y CORRIENDO ---\n");
+    rtc.adjust(DateTime(2026, 5, 21, 13, 13, 1));
+
+    //Serial.println("--- SISTEMA LISTO Y CORRIENDO ---\n");
 }
 
 void loop() {

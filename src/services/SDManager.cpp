@@ -1,6 +1,8 @@
 #include "SDManager.h"
 #include <SPI.h>
 
+#include "../../Debug.h"
+
 const char* SDManager::TAG = "SD_MGR";
 /**
  * @brief Default constructor.
@@ -16,12 +18,12 @@ esp_err_t SDManager::begin() {
 
     // Intentamos montar la tarjeta
     if (!SD.begin()) {
-        ESP_LOGE(TAG, "Fallo crítico: No se pudo montar la tarjeta SD");
+        MY_LOGE(TAG, "Fallo crítico: No se pudo montar la tarjeta SD");
         return ESP_ERR_SD_MOUNT;
     }
 
     _initialized = true;
-    ESP_LOGI(TAG, "Tarjeta SD montada correctamente");
+    MY_LOGI(TAG, "Tarjeta SD montada correctamente");
     return ESP_OK;
 }
 
@@ -46,7 +48,7 @@ esp_err_t SDManager::createFile(const char* path) {
         return ESP_OK;
     }
     
-    ESP_LOGE(TAG, "Error al crear archivo: %s", path);
+    MY_LOGE(TAG, "Error al crear archivo: %s", path);
     return ESP_ERR_SD_WRITE_FAIL;
 }
 
@@ -107,7 +109,7 @@ esp_err_t SDManager::createDirectory(const char* path) {
         return ESP_OK;
     }
 
-    ESP_LOGE(TAG, "Fallo al crear directorio: %s", path);
+    MY_LOGE(TAG, "Fallo al crear directorio: %s", path);
     return ESP_ERR_SD_DIR_FAIL;
 }
 
@@ -125,7 +127,7 @@ esp_err_t SDManager::deleteFile(const char* path) {
         return ESP_OK;
     }
 
-    ESP_LOGE(TAG, "Fallo al eliminar archivo: %s", path);
+    MY_LOGE(TAG, "Fallo al eliminar archivo: %s", path);
     return ESP_ERR_SD_WRITE_FAIL;
 }
 
@@ -138,7 +140,7 @@ esp_err_t SDManager::withFile(const char* path, StreamCallback callback, void* c
 
     File file = SD.open(path, FILE_READ);
     if (!file) {
-        ESP_LOGW(TAG, "Archivo no encontrado para lectura: %s", path);
+        MY_LOGW(TAG, "Archivo no encontrado para lectura: %s", path);
         return ESP_ERR_SD_FILE_NOT_FOUND;
     }
 
@@ -154,7 +156,7 @@ esp_err_t SDManager::withFileWrite(const char* path, StreamCallback callback, vo
 
     File file = SD.open(path, FILE_WRITE);
     if (!file) {
-        ESP_LOGE(TAG, "No se pudo abrir para escritura: %s", path);
+        MY_LOGE(TAG, "No se pudo abrir para escritura: %s", path);
         return ESP_ERR_SD_WRITE_FAIL;
     }
 
@@ -176,13 +178,13 @@ esp_err_t SDManager::listDirectory(const char* dirPath, FileIterationCallback ca
     // Abrimos la ruta del directorio
     File root = SD.open(dirPath);
     if (!root) {
-        ESP_LOGE(TAG, "Fallo al abrir el directorio: %s", dirPath);
+        MY_LOGE(TAG, "Fallo al abrir el directorio: %s", dirPath);
         return ESP_ERR_SD_DIR_FAIL; // O un error equivalente tuyo
     }
 
     // Validamos que realmente sea un directorio y no un archivo suelto
     if (!root.isDirectory()) {
-        ESP_LOGW(TAG, "La ruta provista no es un directorio: %s", dirPath);
+        MY_LOGW(TAG, "La ruta provista no es un directorio: %s", dirPath);
         root.close();
         return ESP_ERR_SD_DIR_FAIL; 
     }
@@ -217,7 +219,7 @@ esp_err_t SDManager::getFileSize(const char* path, uint32_t* outSize) {
     // 3. Comprobar si el archivo físico existe en la SD
     if (!SD.exists(path)) {
         *outSize = 0; // Inicialización de seguridad en caso de fallo
-        ESP_LOGW(TAG, "No se puede obtener tamaño. El archivo no existe: %s", path);
+        MY_LOGW(TAG, "No se puede obtener tamaño. El archivo no existe: %s", path);
         return ESP_ERR_SD_FILE_NOT_FOUND;
     }
 
@@ -225,7 +227,7 @@ esp_err_t SDManager::getFileSize(const char* path, uint32_t* outSize) {
     File file = SD.open(path, FILE_READ);
     if (!file) {
         *outSize = 0;
-        ESP_LOGE(TAG, "Fallo al abrir archivo para verificar tamaño: %s", path);
+        MY_LOGE(TAG, "Fallo al abrir archivo para verificar tamaño: %s", path);
         return ESP_ERR_SD_WRITE_FAIL; // O un error genérico de acceso a la SD
     }
 

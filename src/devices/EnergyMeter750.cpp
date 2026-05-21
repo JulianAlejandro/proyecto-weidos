@@ -1,32 +1,33 @@
 #include "EnergyMeter750.h"
+#include "../../Debug.h"
 
 EnergyMeter750::EnergyMeter750() {}
 
 esp_err_t EnergyMeter750::begin(ModbusTransport* modbus) {
     if (modbus == nullptr) {
-        ESP_LOGE(TAG, "Fallo al iniciar: Puntero Modbus nulo");
+        MY_LOGE(TAG, "Fallo al iniciar: Puntero Modbus nulo");
         return ESP_ERR_INVALID_ARG;
     }
     _modbus = modbus;
     _initialized = true;
-    ESP_LOGI(TAG, "Controlador EM750 inicializado correctamente");
+    MY_LOGI(TAG, "Controlador EM750 inicializado correctamente");
     return ESP_OK;
 }
 
 esp_err_t EnergyMeter750::executeRequest(EM_request req) {
     if (!_initialized) {
-        ESP_LOGW(TAG, "Intento de ejecución sin inicializar");
+        MY_LOGW(TAG, "Intento de ejecución sin inicializar");
         return ESP_ERR_EM750_NOT_INIT;
     }
 
     // 1. Validaciones previas
     if (req.size == 0 || req.size > MAX_MODBUS_REGS_REQUEST) {
-        ESP_LOGE(TAG, "Tamaño de request inválido: %d", req.size);
+        MY_LOGE(TAG, "Tamaño de request inválido: %d", req.size);
         return ESP_ERR_INVALID_SIZE;
     }
 
     if (req.start_addr > MAX_EM_ADDR || (req.start_addr + req.size - 1) > MAX_EM_ADDR) {
-        ESP_LOGE(TAG, "Dirección fuera de rango: 0x%04X", req.start_addr);
+        MY_LOGE(TAG, "Dirección fuera de rango: 0x%04X", req.start_addr);
         return ESP_ERR_EM750_ADDR_OUT_RANGE;
     }
 
@@ -46,7 +47,7 @@ esp_err_t EnergyMeter750::executeRequest(EM_request req) {
     }
 
     // 3. Si hubo error, lo propagamos tal cual vino del transporte
-    ESP_LOGE(TAG, "Error Modbus (0x%X) en dirección 0x%04X", err, req.start_addr);
+    MY_LOGE(TAG, "Error Modbus (0x%X) en dirección 0x%04X", err, req.start_addr);
     return err; 
 }
 

@@ -4,170 +4,47 @@
 #include "SDManager.h"
 #include "DataloggerFileManager.h"
 #include "LogBuffer.h"
+#include <esp_err.h>
+#include <esp_log.h>
 
 #define MAX_LOGS 4
 #define FILE_TEXT_SIZE 32 
 
+// Umbral máximo por archivo de log (Ej: 20MB o 2KB para pruebas)
 //#define MAX_FILE_SIZE_BYTES (20 * 1024 * 1024UL)
-#define MAX_FILE_SIZE_BYTES (2 * 1024UL) // DE PRUEBA
+#define MAX_FILE_SIZE_BYTES (2 * 1024UL)
 
 class Datalogger {
 private:
-  SDManager* _sd;
-  DataloggerFileManager _fileManager;
-  LogBuffer _buffer; 
+    SDManager* _sd;
+    DataloggerFileManager _fileManager;
+    LogBuffer _buffer; 
 
-  char _logPath[FILE_TEXT_SIZE];
-  bool _initialized = false;
-  bool _isReady = false; 
+    char _logPath[FILE_TEXT_SIZE];
+    bool _initialized = false;
 
-  uint32_t _currentFileSizeBytes = 0; 
-  bool _fileLimitReached = false; 
+    uint32_t _currentFileSizeBytes = 0; 
+    bool _fileLimitReached = false; 
 
-  void m_pushToBuffer(const char* csvLine); 
+    // Modificada para retornar esp_err_t ante problemas de desbordamiento o SD
+    esp_err_t m_pushToBuffer(const char* csvLine); 
 
 public:
+    Datalogger(SDManager* sdManager);
 
-  Datalogger(SDManager* sdManager);
+    esp_err_t begin();
+    void setMaxFiles(uint16_t maxFiles);
 
-  esp_err_t begin ();
+    // Métodos para estructura CSV
+    esp_err_t newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles);
+    esp_err_t appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues); 
+    
+    esp_err_t appendErrorLog(const char* timestamp_msg, const char* err_message);
 
-  void setMaxFiles(uint16_t maxFiles);
+    // Cambiado de bool a esp_err_t para propagar errores físicos de la SD
+    esp_err_t flushBuffer();
 
-// caso especifico de almacenar datos en formato CSV
-// El timestamp de newCSVLogSesion tiene que estar actualizado con rigor
-  esp_err_t newCSVLogSesion(const char * current_timestamp, const char** titles, uint16_t numTitles);
-
-  // En el mensaje de datos enviado el mensaje de timestamp lo pone el usuario..
-  esp_err_t appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues); 
-
-  esp_err_t appendErrorLog(const char* timestamp_msg, const char* err_message);
-
-  bool flushBuffer();
-
-  bool isFileLimitReached() const { return _fileLimitReached;}
-
-  //void clearFileLimit() {_fileLimitReached = false; }
+    bool isFileLimitReached() const { return _fileLimitReached; }
 };
 
 #endif
-
-
-
-//#ifndef DATALOGGER_H
-//#define DATALOGGER_H
-//
-//#include <Arduino.h>
-//#include "SDManager.h"
-//#include "LogBuffer.h"
-//
-//#define MAX_LOG_CAPACITY 150
-//#define FILE_NAME_SIZE 32 // Supports full path (e.g., /LOGS/YYMMDDHH.txt)
-//#define DIR_LOG_NAME "/LOGS"
-////formato que recibe de nombre en el _currentLogFile
-//
-///**
-// * @class Datalogger
-// * @brief Manages circular logging, file creation, and structured data writing to SD.
-// */
-//class Datalogger {
-//private:
-//    char _filenames[MAX_LOG_CAPACITY][FILE_NAME_SIZE]; // Array to store existing log paths
-//    uint16_t _fileCount;  
-//    uint16_t _userMaxFiles; //Client limit
-//                              // Current number of logged files
-//    char _currentLogFile[FILE_NAME_SIZE];           // Path of the currently active log
-//    SDManager* _sd;                                 // Pointer to the SD hardware manager
-//
-//    LogBuffer _buffer;
-//
-//    /**
-//     * @brief Checks if a file has a valid logging extension (.log or .txt).
-//     */
-//    bool hasLogExtension(const char* filename);
-//
-//    /**
-//     * @brief Internal logic to add a new file to the system. 
-//     * Handles circular buffer (deleting oldest) and duplicate naming.
-//     */
-//    bool addAndSetLogFile(const char* filename);
-//
-//    void m_pushToBuffer(const char* csvLine); 
-//
-//public:
-//    /**
-//     * @brief Constructor.
-//     * @param sdManager Pointer to an initialized SDManager instance.
-//     */
-//    Datalogger(SDManager* sdManager, uint16_t maxFiles);
-//
-//    /**
-//     * @brief Initializes the logging directory and scans existing files.
-//     * @return true if the directory is ready.
-//     */
-//    bool begin();
-//
-//    /**
-//     * @brief Starts a new session: creates file, clears it, and writes the header.
-//     * @param name Desired filename.
-//     * @param titles Array of column titles.
-//     * @param numTitles Number of titles provided.
-//     */
-//    bool newSesion(const char * name, const char** titles, uint16_t numTitles);
-//
-//    /**
-//     * @brief Prepares a new log file path and registers it in the system.
-//     */
-//    bool newLog(const char* name);
-//
-//    /**
-//     * @brief Scans the /LOGS directory to populate internal file tracking.
-//     */
-//    void scanExistingLogs();
-//
-//    /**
-//     * @brief Sets the active log file by its index in the internal array.
-//     */
-//    void selectLogByIndex(uint16_t index);
-//
-//    /**
-//     * @brief Writes a CSV-formatted header to the current log file.
-//     */
-//    bool writeHeader(const char** titulos, uint16_t numTitulos); 
-//
-//    /**
-//     * @brief Writes a single row of data with a timestamp.
-//     * @param timestamp String representing the current time.
-//     * @param values Array of string values to be logged.
-//     * @param numValues Number of values in the array.
-//     */
-//    bool writeRow(const char* timestamp, const char** values, uint16_t numValues);
-//
-//    /**
-//     * @brief Truncates the current log file to zero size.
-//     */
-//    void clearLogFile();
-//
-//    /**
-//     * @brief Dumps the content of the current log file to the Serial monitor.
-//     */
-//    void printLogToSerial();
-//
-//    /**
-//     * @brief Physically deletes all log files within the /LOGS directory.
-//     */
-//    void clearAllLogs();
-//
-//    /**
-//     * @brief Returns the path of the currently active log file.
-//     * @return Constant pointer to the filename string.
-//    */
-//    const char* getCurrentLogFile() const { return _currentLogFile; }
-//
-//    void setMaxFiles(uint16_t maxFiles);
-//
-//    bool flushBuffer(); 
-//};
-//
-//#endif
-//

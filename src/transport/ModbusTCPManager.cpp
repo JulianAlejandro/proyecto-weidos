@@ -1,4 +1,5 @@
 #include "ModbusTCPManager.h"
+#include "../../Debug.h"
 
 static const char* TAG = "MB_TCP_MGR";
 
@@ -15,15 +16,15 @@ esp_err_t ModbusTCPManager::ensureConnection() {
     // Liberar recursos del socket antes de reintentar
     _modbusClient.stop(); 
     
-    ESP_LOGW(TAG, "Reintentando conexión con servidor %s:%d", _serverIP.toString().c_str(), _port);
+    MY_LOGW(TAG, "Reintentando conexión con servidor %s:%d", _serverIP.toString().c_str(), _port);
     
     if (!_modbusClient.begin(_serverIP, _port)) {
-        ESP_LOGE(TAG, "Error de transporte: No se pudo abrir el socket TCP");
+        MY_LOGE(TAG, "Error de transporte: No se pudo abrir el socket TCP");
         return ESP_ERR_MODBUS_TCP_SOCKET; 
     }
     
     delay(50); // Tiempo de cortesía para el handshake TCP
-    ESP_LOGI(TAG, "Conexión establecida con éxito");
+    MY_LOGI(TAG, "Conexión establecida con éxito");
     return ESP_OK;
 }
 
@@ -31,13 +32,13 @@ esp_err_t ModbusTCPManager::ensureConnection() {
  * @brief Inicialización de hardware Ethernet.
  */
 esp_err_t ModbusTCPManager::begin(byte mac[], IPAddress localIP) {
-    ESP_LOGI(TAG, "Inicializando chip Ethernet...");
+    MY_LOGI(TAG, "Inicializando chip Ethernet...");
     Ethernet.init(ETHERNET_CS); 
     Ethernet.begin(mac, localIP);
     
     // Verificación de hardware físico
     if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-        ESP_LOGE(TAG, "Hardware Ethernet no detectado");
+        MY_LOGE(TAG, "Hardware Ethernet no detectado");
         return ESP_ERR_NOT_FOUND;
     }
     
@@ -61,7 +62,7 @@ esp_err_t ModbusTCPManager::readHoldingRegisters(uint16_t address, uint16_t quan
     if (status != ESP_OK) return status;
 
     if (!_modbusClient.requestFrom(_slaveID, HOLDING_REGISTERS, address, quantity)) {
-        ESP_LOGE(TAG, "Fallo en lectura Regs @ 0x%04X. Cerrando socket.", address);
+        MY_LOGE(TAG, "Fallo en lectura Regs @ 0x%04X. Cerrando socket.", address);
         _modbusClient.stop(); // Forzamos cierre para limpiar el buffer en caso de error
         return ESP_ERR_MODBUS_TIMEOUT;
     }

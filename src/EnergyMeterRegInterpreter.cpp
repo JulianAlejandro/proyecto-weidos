@@ -3,6 +3,7 @@
 #include "devices/EnergyMeter750.h"
 #include "services/Datalogger.h"
 #include <RTClib.h>
+#include "../Debug.h"
 
 /**
  * @struct StreamContext
@@ -332,6 +333,7 @@ esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest M
     _int_log_interval = atoi(param.log_interval);
     _int_max_files = atoi(param.max_files);
 
+/*
     Serial.print("log interval: ");
     Serial.println(param.log_interval);
 
@@ -340,6 +342,8 @@ esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest M
 
     Serial.print("tiempo file"); 
     Serial.println(param.new_file);
+
+    */
 
     if (_int_max_files <= 0 || _int_max_files >= MAX_LOG_CAPACITY) {
         return ESP_ERR_INTERPRETER_BAD_CONF;
@@ -361,7 +365,7 @@ esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest M
  */
  esp_err_t EnergyMeterRegInterpreter::advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc) {
     if (!_advancedIsInitialized){ 
-        Serial.println("error de que no se inicializo el advanced"); 
+        //Serial.println("error de que no se inicializo el advanced"); 
         return ESP_ERR_INTERPRETER_NOT_INIT;
     };
 
@@ -387,7 +391,10 @@ esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest M
             ultimaUnidadTiempo = ahora.minute(); // Actualizamos bandera
             err = crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
 
-            if (err != ESP_OK){Serial.println("error 2");  return err;}
+            if (err != ESP_OK){
+                //Serial.println("error 2");  
+            return err;
+            }
         }
     }
 
@@ -398,7 +405,7 @@ esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest M
         err = lectura_modbus(datalogger, rtc, em, _current_request);
        
         if (err != ESP_OK){
-            Serial.println("error 3");  
+            //Serial.println("error 3");  
             return err;
         };
     }
@@ -519,8 +526,8 @@ esp_err_t crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameCo
     esp_err_t err; 
     //Serial.println(F(">> NO COINCIDE: Creando nueva sesión...")); 
 
-    Serial.print("nueva sesion: "); 
-    Serial.println(nombreFichero);
+    //Serial.print("nueva sesion: "); 
+    //Serial.println(nombreFichero);
 
     err = datalogger->newCSVLogSesion(nombreFichero, misTitulos->buffer, misTitulos->size);
     if(err != ESP_OK){
@@ -546,7 +553,7 @@ esp_err_t EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_
     esp_err_t err = em->executeRequest(req);
     
     if (err != ESP_OK) {
-        ESP_LOGE("INTERP", "Fallo Modbus: 0x%X", err);
+        MY_LOGE("INTERP", "Fallo Modbus: 0x%X", err);
         return err; // No intentamos procesar datos basura
     }
 
@@ -567,7 +574,10 @@ esp_err_t EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_
 
     err = datalogger->appendNewDataCSVToLog(bufferTime, res.buffer, res.size);
     if(err != ESP_OK){
-        Serial.println("el error tiene pinta de que es aqui"); 
+        if((err == ESP_ERR_INVALID_STATE) && datalogger->isFileLimitReached()){
+            return ESP_OK; // simplemente no se hace nada, se prosigue. de momento
+        }
+        //Serial.println("el error tiene pinta de que es aqui"); 
         return err; 
     }
 /*
