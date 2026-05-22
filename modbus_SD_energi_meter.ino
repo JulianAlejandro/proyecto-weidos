@@ -1,3 +1,4 @@
+/*
 #include <RTClib.h>
 
 // Transport Layer implementations
@@ -25,6 +26,57 @@ RTC_DS3231 rtc;
 SDManager sd; 
 
 DataloggerFileManager fileManager(&sd, 4); 
+Datalogger datalogger(&sd, &fileManager); 
+
+EnergyMeterRegInterpreter regInterpreter(&sd); 
+EnergyMeter750 energy_meter; 
+ModbusRequestCSV mb_csv(&sd);
+ModbusTransport* modbus = nullptr; // Polymorphic pointer for TCP or RTU
+
+uint8_t g_my_log_current_level = MY_LOG_LEVEL_VERBOSE; 
+
+
+void setup() {
+
+    Serial.begin(115200);
+    while(!Serial); 
+    
+}
+
+void loop() {
+
+    delay(1000); 
+}
+*/
+
+
+#include <RTClib.h>
+
+// Transport Layer implementations
+#include "src/transport/ModbusTCPManager.h" 
+#include "src/transport/ModbusRTUManager.h"
+
+// Core Services
+#include "src/services/BasicLogFileManager.h"
+#include "src/services/Datalogger.h"
+#include "src/devices/EnergyMeter750.h"
+#include "src/services/SDManager.h"
+
+// Logic and Configuration Managers
+#include "src/EnergyMeterRegInterpreter.h"
+#include "src/ModbusRequestCSV.h"
+
+#include "src/Debug.h"
+
+// Default Modbus Settings
+#define SLAVE_ADDRESS 1 
+#define MODBUS_PORT 502
+
+// Global Instances
+RTC_DS3231 rtc;
+SDManager sd; 
+
+BasicLogFileManager fileManager(&sd, 4); 
 Datalogger datalogger(&sd, &fileManager); 
 
 EnergyMeterRegInterpreter regInterpreter(&sd); 

@@ -1,24 +1,15 @@
 #ifndef MODBUS_REQUEST_CSV_H
 #define MODBUS_REQUEST_CSV_H
 
+#include "global_types.h"
 #include "services/SDManager.h"
+
 
 #define ESP_ERR_CONFIG_BASE         0x50000
 #define ESP_ERR_CONFIG_NOT_INIT     (ESP_ERR_CONFIG_BASE + 1)
 #define ESP_ERR_CONFIG_PARSE_FAIL   (ESP_ERR_CONFIG_BASE + 2)
 #define ESP_ERR_CONFIG_INVALID_DATA (ESP_ERR_CONFIG_BASE + 3)
 
-/**
- * @struct Struct_MBRequest
- * @brief Container for Modbus transaction parameters extracted from CSV.
- */
-struct Struct_MBRequest {
-    uint16_t channel;           ///< Slave ID / Unit ID
-    uint16_t start_addres;      ///< Register starting address
-    uint16_t length;            ///< Number of registers to read
-    uint16_t func_code;         ///< Modbus Function Code (e.g., 3 or 4)
-    uint16_t req_interval_ms;   ///< Polling interval in milliseconds
-};
 
 #define MAX_TITLES_SIZE 32
 #define MODBUS_REQ_FILE "MBReq.csv"

@@ -6,6 +6,7 @@
 #include <ArduinoModbus.h>
 #include "../EnergyMeterRegInterpreter.h"
 #include "../core/ModbusTransport.h"
+#include "../global_types.h"
 
 // Definición de errores específicos (opcional pero profesional)
 #define ESP_ERR_EM750_BASE           0x20000

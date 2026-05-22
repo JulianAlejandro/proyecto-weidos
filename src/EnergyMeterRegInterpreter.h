@@ -3,7 +3,7 @@
 
 #include "services/SDManager.h"
 #include <CSV_Parser.h>
-#include "ModbusRequestCSV.h"
+#include "global_types.h"
 
 // codigos
 #define ESP_ERR_INTERPRETER_BASE      0x60000
@@ -49,14 +49,6 @@ struct RegisterEntry {
     bool logEnabled;
 };
 
-/**
- * @struct EM_request
- * @brief Structure to define a Modbus range request.
- */
-struct EM_request {
-    uint16_t start_addr; 
-    uint16_t size; 
-};
 
 /**
  * @struct rawDataReg

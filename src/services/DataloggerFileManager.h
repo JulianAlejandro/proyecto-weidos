@@ -6,14 +6,11 @@
 
 #include <esp_log.h> // <-- Cambiamos Serial por ESP_LOG
 
-
 #define FILE_NAME_SIZE 32 
 #define DIR_LOG_NAME "/LOGS"
 #define PATH_ERR_LOG "/LOGS/ERROR"
 
 #define DEFAULT_YEAR 2026
-
-
 
 class DataloggerFileManager : public ILogFileManager {
 
