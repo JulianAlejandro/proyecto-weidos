@@ -241,7 +241,7 @@ void DataloggerFileManager::setLastLogTime() {
     MY_LOGI(TAG, "Último histórico detectado en SD -> Año: %u | Timestamp: %u", _intLastYearLog, _intLastTimestampLog);
 }
 
-esp_err_t DataloggerFileManager::setCSVLastEnvironment(bool delete_rest) {
+esp_err_t DataloggerFileManager::setLastEnvironment(bool delete_rest) {
     esp_err_t err = setLastSesion();
     if (err != ESP_OK) return err;
     
@@ -345,7 +345,7 @@ esp_err_t DataloggerFileManager::newFileLog(const char* timestamp) {
         esp_err_t err = newYearFile(incomingYear); 
         if (err != ESP_OK) return err;
 
-        err = setCSVLastEnvironment(true); 
+        err = setLastEnvironment(true); 
         if (err != ESP_OK) return err; 
     } 
     else { // Mismo año
@@ -454,3 +454,6 @@ char* DataloggerFileManager::getCurrentLogPath() {
     return _currentLogFile; 
 }
 
+bool DataloggerFileManager::requiresTimestamp() { 
+    return true; 
+}

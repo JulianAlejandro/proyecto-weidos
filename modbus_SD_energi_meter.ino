@@ -5,6 +5,7 @@
 #include "src/transport/ModbusRTUManager.h"
 
 // Core Services
+#include "src/services/DataloggerFileManager.h"
 #include "src/services/Datalogger.h"
 #include "src/devices/EnergyMeter750.h"
 #include "src/services/SDManager.h"
@@ -22,7 +23,10 @@
 // Global Instances
 RTC_DS3231 rtc;
 SDManager sd; 
-Datalogger datalogger(&sd); //30 ficheros por defecto
+
+DataloggerFileManager fileManager(&sd, 4); 
+Datalogger datalogger(&sd, &fileManager); 
+
 EnergyMeterRegInterpreter regInterpreter(&sd); 
 EnergyMeter750 energy_meter; 
 ModbusRequestCSV mb_csv(&sd);
@@ -68,26 +72,6 @@ void check_critical_error(esp_err_t err, const char* msg) {
     }
 }
 
-/*
-void check_critical_error(esp_err_t err, const char* msg) {
-    if (err != ESP_OK) {
-
-        
-        Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
-        Serial.println("Reiniciando sistema en 5 segundos...");
-        
-        delay(5000); // Tiempo para que el usuario pueda leer el error en el monitor
-
-        //datalogger.appendErrorLog(const char *timestamp_msg, const char *err_message);
-
-        sd.end(); 
-
-        while(true); 
-        
-        ESP.restart(); // <--- Aquí generas el reset por código
-    }
-}
-*/
 
 void setup() {
 
@@ -101,6 +85,8 @@ void setup() {
         Serial.println("En esta aplicacion el RTC es vital..."); 
         while(true);
     }
+
+    rtc.adjust(DateTime(2026, 5, 22, 13, 33, 1));
 
     esp_err_t err;
 
@@ -166,3 +152,83 @@ void loop() {
     delay(1000); 
 }
 
+
+
+/*
+#include "src/services/BasicLogFileManager.h"
+#include "src/services/SDManager.h"
+#include "src/Debug.h"
+
+SDManager sd; 
+BasicLogFileManager bFileManager(&sd, 4);
+uint8_t g_my_log_current_level = MY_LOG_LEVEL_VERBOSE; 
+
+
+void check_critical_error(esp_err_t err, const char* msg) {
+    if (err != ESP_OK) {
+        Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
+
+        sd.end(); 
+        while(true); 
+        Serial.println("Reiniciando sistema en 5 segundos...");
+        delay(5000); 
+        ESP.restart(); 
+    }
+}
+
+void setup() {
+
+    Serial.begin(115200);
+    while(!Serial);
+
+    my_log_level_set(MY_LOG_LEVEL_VERBOSE); // imponemos un nivel de log de error 
+    esp_err_t err;
+
+    err = sd.begin();
+    check_critical_error(err, "Fallo en Hardware SD");
+
+    err = bFileManager.begin(); 
+    check_critical_error(err, "Fallo en Hardware SD");
+
+    err = bFileManager.setLastEnvironment(false); 
+
+    Serial.print("Este es el path: ");
+    Serial.println(bFileManager.getCurrentLogPath()); 
+
+    char* a = "prueba"; 
+    bFileManager.newFileLog(a); 
+
+     Serial.print("Este es el path que deberia ser el 1: ");
+    Serial.println(bFileManager.getCurrentLogPath());
+
+     
+    bFileManager.newFileLog(a); 
+    Serial.print("Este es el path que deberia ser el 2: ");
+    Serial.println(bFileManager.getCurrentLogPath());
+
+    bFileManager.newFileLog(a); 
+    Serial.print("Este es el path que deberia ser el 3: ");
+    Serial.println(bFileManager.getCurrentLogPath()); 
+
+    bFileManager.newFileLog(a); 
+    Serial.print("Este es el path que deberia ser el 4: ");
+    Serial.println(bFileManager.getCurrentLogPath());
+
+    bFileManager.newFileLog(a); 
+    Serial.print("Este es el path que deberia ser el 5: ");
+    Serial.println(bFileManager.getCurrentLogPath());
+
+    bFileManager.newFileLog(a); 
+    Serial.print("Este es el path que deberia ser el 6: ");
+    Serial.println(bFileManager.getCurrentLogPath()); 
+
+    Serial.println("final"); 
+}
+
+void loop(){
+
+  delay(100); 
+
+}
+
+*/

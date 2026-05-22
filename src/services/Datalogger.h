@@ -2,7 +2,7 @@
 #define DATALOGGER_H
 
 #include "SDManager.h"
-#include "DataloggerFileManager.h"
+#include "ILogFileManager.h"
 #include "LogBuffer.h"
 #include <esp_err.h>
 #include <esp_log.h>
@@ -17,7 +17,7 @@
 class Datalogger {
 private:
     SDManager* _sd;
-    DataloggerFileManager _fileManager;
+    ILogFileManager* _fileManager;
     LogBuffer _buffer; 
 
     char _logPath[FILE_TEXT_SIZE];
@@ -30,7 +30,7 @@ private:
     esp_err_t m_pushToBuffer(const char* csvLine); 
 
 public:
-    Datalogger(SDManager* sdManager);
+    Datalogger(SDManager* sdManager, ILogFileManager* fileManager);
 
     esp_err_t begin();
     void setMaxFiles(uint16_t maxFiles);

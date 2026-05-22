@@ -1,26 +1,21 @@
 #ifndef DATALOGGER_FILE_MANAGER_H
 #define DATALOGGER_FILE_MANAGER_H
 
+#include "ILogFileManager.h"
 #include "SDManager.h"
-#include <esp_err.h>
-#include <esp_log.h> // <-- Cambiamos Serial por ESP_LOG
-#include "LogBuffer.h"
 
-#define MAX_LOG_CAPACITY 150
+#include <esp_log.h> // <-- Cambiamos Serial por ESP_LOG
+
+
 #define FILE_NAME_SIZE 32 
 #define DIR_LOG_NAME "/LOGS"
 #define PATH_ERR_LOG "/LOGS/ERROR"
 
 #define DEFAULT_YEAR 2026
 
-// --- CÓDIGOS DE ERROR PERSONALIZADOS ---
-#define ESP_ERR_DL_BASE           0x9000
-#define ESP_ERR_SD_NOT_INIT       (ESP_ERR_DL_BASE + 1)
-#define ESP_ERR_SD_WRITE_FAIL     (ESP_ERR_DL_BASE + 2)
-#define ESP_ERR_DL_PAST_TIME      (ESP_ERR_DL_BASE + 3)
-#define ESP_ERR_DL_NOT_INIT       (ESP_ERR_DL_BASE + 4)
 
-class DataloggerFileManager {
+
+class DataloggerFileManager : public ILogFileManager {
 
 private:
   SDManager* _sd; 
@@ -49,12 +44,14 @@ private:
 
 public:
   DataloggerFileManager(SDManager* sdManager, uint16_t maxFiles);
-  void setMaxFiles(uint16_t maxFiles);
-  esp_err_t begin();
-  esp_err_t setCSVLastEnvironment(bool delete_rest);
-  esp_err_t newFileLog(const char* timestamp);
-  char* getCurrentLogPath(); 
+
+  void setMaxFiles(uint16_t maxFiles) override;
+  esp_err_t begin() override;
+  esp_err_t setLastEnvironment(bool delete_rest) override;
+  esp_err_t newFileLog(const char* timestamp) override;
+  char* getCurrentLogPath() override; 
   esp_err_t appendErrorLog(const char* timestamp, const char* err_message);
+  bool requiresTimestamp() override;
 };
 
 #endif

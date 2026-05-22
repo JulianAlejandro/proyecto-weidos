@@ -5,32 +5,32 @@
 
 static const char* TAG = "DATALOGGER";
 
-Datalogger::Datalogger(SDManager* sdManager) 
-    : _sd(sdManager), _fileManager(sdManager, MAX_LOGS), _initialized(false), _fileLimitReached(false) {
+Datalogger::Datalogger(SDManager* sdManager, ILogFileManager* fileManager) 
+    : _sd(sdManager), _fileManager(fileManager), _initialized(false), _fileLimitReached(false) {
     _logPath[0] = '\0';
 }
 
 esp_err_t Datalogger::begin() {
-    if (_sd == nullptr || !_sd->isReady()) {
-        MY_LOGE(TAG, "begin: SD Manager no asignado o no está listo.");
+    if (_sd == nullptr || !_sd->isReady() || _fileManager == nullptr) { // validación extra de puntero
+        MY_LOGE(TAG, "begin: Dependencias no asignadas o SD no lista.");
         return ESP_ERR_SD_NOT_INIT;
     }
 
     // 1. Inicializamos el gestor de archivos interno
-    esp_err_t err = _fileManager.begin();
+    esp_err_t err = _fileManager->begin();
     if (err != ESP_OK) {
         MY_LOGE(TAG, "begin: Falló inicialización de FileManager [0x%X]", err);
         return err; 
     }
 
     // 2. Escaneamos la SD para recuperar el último entorno de trabajo
-    err = _fileManager.setCSVLastEnvironment(true); 
+    err = _fileManager->setLastEnvironment(true); 
     if (err != ESP_OK) {
         MY_LOGE(TAG, "begin: Falló al establecer el entorno de logs [0x%X]", err);
         return err; 
     }
 
-    char* currentLogPtr = _fileManager.getCurrentLogPath();
+    char* currentLogPtr = _fileManager->getCurrentLogPath();
     
     // 3. Verificar si se detectó un archivo existente para continuar en él
     if (currentLogPtr != nullptr && currentLogPtr[0] != '\0') {
@@ -67,7 +67,7 @@ esp_err_t Datalogger::begin() {
 }
 
 void Datalogger::setMaxFiles(uint16_t maxFiles) {
-    _fileManager.setMaxFiles(maxFiles);
+    _fileManager->setMaxFiles(maxFiles);
 }
 
 esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles) {
@@ -85,14 +85,19 @@ esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char*
         if (flushErr != ESP_OK) return flushErr;
     }
 
+    esp_err_t err;
     // Solicitar nuevo archivo físico basado en el timestamp de control
-    esp_err_t err = _fileManager.newFileLog(current_timestamp); 
+    if (_fileManager->requiresTimestamp()){
+        err = _fileManager->newFileLog(current_timestamp);
+    }else{
+        err = _fileManager->newFileLog();
+    }
     if (err != ESP_OK) {
         MY_LOGE(TAG, "No se pudo generar el nuevo archivo de log en FileManager [0x%X]", err);
         return err;
     }
 
-    char* currentLogPtr = _fileManager.getCurrentLogPath();
+    char* currentLogPtr = _fileManager->getCurrentLogPath();
     if (currentLogPtr != nullptr && currentLogPtr[0] != '\0') {
         strncpy(_logPath, currentLogPtr, sizeof(_logPath) - 1);
         _logPath[sizeof(_logPath) - 1] = '\0'; 
@@ -211,5 +216,5 @@ esp_err_t Datalogger::m_pushToBuffer(const char* csvLine) {
 
 esp_err_t Datalogger::appendErrorLog(const char* timestamp_msg, const char* err_message) {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
-    return _fileManager.appendErrorLog(timestamp_msg, err_message); 
+    return _fileManager->appendErrorLog(timestamp_msg, err_message); 
 }
