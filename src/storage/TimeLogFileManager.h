@@ -1,14 +1,14 @@
-#ifndef DATALOGGER_FILE_MANAGER_H
-#define DATALOGGER_FILE_MANAGER_H
+#ifndef TIME_LOG_FILE_MANAGER_H
+#define TIME_LOG_FILE_MANAGER_H
 
 #include "ILogFileManager.h"
 #include "SDManager.h"
 
-//#include <esp_log.h> // <-- Cambiamos Serial por ESP_LOG
-
 #define FILE_NAME_SIZE 32 
 #define DIR_LOG_NAME "/LOGS"
 #define PATH_ERR_LOG "/LOGS/ERROR"
+
+#define LOG_FILE_EXT   ".csv"
 
 #define DEFAULT_YEAR 2026
 

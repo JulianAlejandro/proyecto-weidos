@@ -5,8 +5,8 @@
 #include "ModbusRTUManager.h"
 
 // Core Services
-//#include "services/BasicLogFileManager.h"
-#include "TimeLogFileManager.h"
+#include "BasicLogFileManager.h"
+//#include "TimeLogFileManager.h"
 #include "Datalogger.h"
 #include "EnergyMeter750.h"
 #include "SDManager.h"
@@ -14,7 +14,6 @@
 // Logic and Configuration Managers
 #include "EnergyMeterRegInterpreter.h"
 #include "ModbusRequestCSV.h"
-
 
 // Default Modbus Settings
 #define SLAVE_ADDRESS 1 
@@ -25,7 +24,7 @@ RTC_DS3231 rtc;
 SDManager sd; 
 
 //BasicLogFileManager fileManager(&sd, 4);
-TimeLogFileManager fileManager(&sd, 4);
+BasicLogFileManager fileManager(&sd, 4);
 Datalogger datalogger(&sd, &fileManager);
 
 EnergyMeterRegInterpreter regInterpreter(&sd); 
@@ -84,7 +83,7 @@ void setup() {
         while(true);
     }
 
-    rtc.adjust(DateTime(2026, 5, 26, 13, 29, 1));
+    rtc.adjust(DateTime(2026, 5, 26, 17, 07, 1));
 
     esp_err_t err;
 
@@ -149,5 +148,4 @@ void loop() {
     // El delay es pequeño para mantener la responsividad
     delay(1000); 
 }
-
 

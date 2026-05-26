@@ -49,16 +49,16 @@ void BasicLogFileManager::buscarContadorMasAltoCallback(const char* fileName, bo
     uint16_t* maxContador = (uint16_t*)context;
     int numeroExtraido = 0;
 
-    // Saltamos la barra inicial si el framework la incluye en el callback (ej: "/LOG00001.txt" -> "LOG00001.txt")
     const char* cleanName = (fileName[0] == '/') ? &fileName[1] : fileName;
 
-    // Intentamos parsear el formato estricto LOG%05d.txt
-    if (sscanf(cleanName, "LOG%05d.txt", &numeroExtraido) == 1) {
+    // 🚀 Cambiado: Concatenamos dinámicamente el patrón esperado con la extensión elegida
+    if (sscanf(cleanName, "LOG%05d" LOG_FILE_EXT, &numeroExtraido) == 1) {
         if (numeroExtraido > *maxContador) {
             *maxContador = (uint16_t)numeroExtraido;
         }
     }
 }
+
 /**
  * @brief Busca en la SD el fichero con el índice más alto para restaurar la sesión.
  */
@@ -67,22 +67,20 @@ esp_err_t BasicLogFileManager::setLastSesion() {
 
     uint16_t maxEncontrado = 0;
     
-    // Escaneamos la carpeta usando nuestro callback
     esp_err_t err = _sd->listDirectory(DIR_LOG_NAME, buscarContadorMasAltoCallback, &maxEncontrado);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "setLastSesion: Error listando directorio %s [0x%X]", DIR_LOG_NAME, err);
         return err;
     }
 
-    // Actualizamos el contador de la clase con el máximo histórico encontrado en la SD
     _fileCount = maxEncontrado;
 
     if (_fileCount == 0) {
         ESP_LOGI(TAG, "setLastSesion: No se encontraron logs previos. Próximo será el 1.");
         _currentLogFile[0] = '\0';
     } else {
-        // Reconstruimos la ruta del archivo más reciente encontrado
-        snprintf(_currentLogFile, sizeof(_currentLogFile), "%s/LOG%05u.txt", DIR_LOG_NAME, _fileCount);
+        // 🚀 Cambiado: Se inyecta la macro de extensión en la ruta recuperada
+        snprintf(_currentLogFile, sizeof(_currentLogFile), "%s/LOG%05u" LOG_FILE_EXT, DIR_LOG_NAME, _fileCount);
         ESP_LOGI(TAG, "Última sesión recuperada con éxito: %s (Contador: %u)", _currentLogFile, _fileCount);
     }
 
@@ -203,7 +201,7 @@ esp_err_t BasicLogFileManager::newFileLog(const char* timestamp) {
    // }
 
     // 3. Construimos la nueva ruta
-    snprintf(_currentLogFile, sizeof(_currentLogFile), "%s/LOG%05u.txt", DIR_LOG_NAME, _fileCount);
+    snprintf(_currentLogFile, sizeof(_currentLogFile), "%s/LOG%05u" LOG_FILE_EXT, DIR_LOG_NAME, _fileCount);
 
     // 4. Si el archivo ya existía del ciclo de rotación anterior, lo eliminamos primero
     //if (_sd->exists(_currentLogFile)) {
@@ -242,6 +240,7 @@ esp_err_t BasicLogFileManager::appendErrorLog(const char* timestamp, const char*
         stream.printf("[%s] ERROR: %s\n", c->t, c->m);
     }, &ctx);
     */
+   return ESP_OK; // TODO: ESTA FUNCION HAYQ UE ANALIZARLA
 }
 
 /*

@@ -103,11 +103,15 @@ void TimeLogFileManager::getSesionFilenamesCallback(const char* fileName, bool i
     size_t len = strlen(shortName);
     ESP_LOGD(TAG, "Evaluando archivo detectado: %s", shortName);
 
-    if (len == 12) { // MMDDHHMM.csv
+    // 🚀 Cambiado: El nombre válido ahora mide 8 caracteres del timestamp + los caracteres de la extensión
+    size_t expectedLen = 8 + strlen(LOG_FILE_EXT);
+
+    if (len == expectedLen) { 
         std::string nameStr(shortName);
         std::transform(nameStr.begin(), nameStr.end(), nameStr.begin(), ::tolower);
 
-        if (nameStr.rfind(".csv") != std::string::npos) {
+        // 🚀 Cambiado: Busca dinámicamente la extensión configurada en el define
+        if (nameStr.rfind(LOG_FILE_EXT) != std::string::npos) {
             fileList->push_back(shortName);
             ESP_LOGD(TAG, "-> ¡Archivo VALIDO añadido!: %s", shortName);
         }
@@ -129,7 +133,7 @@ esp_err_t TimeLogFileManager::setFilesLastSesion() {
     }
 
     if (foundFiles.empty()) {
-        ESP_LOGI(TAG, "No se encontraron archivos de log (.csv) en %s", _baseYearPath);
+        ESP_LOGI(TAG, "No se encontraron archivos de log (%s) en %s", LOG_FILE_EXT, _baseYearPath);
         return ESP_OK;
     }
 
@@ -142,7 +146,8 @@ esp_err_t TimeLogFileManager::setFilesLastSesion() {
         _fileCount++;
     }
 
-    ESP_LOGI(TAG, "Indexados %d archivos .csv más recientes.", _fileCount);
+    // 🚀 Cambiado para mostrar la extensión en el log
+    ESP_LOGI(TAG, "Indexados %d archivos %s más recientes.", _fileCount, LOG_FILE_EXT);
     for (uint16_t i = 0; i < _fileCount; i++) {
         ESP_LOGD(TAG, "Indexado [%d]: %s", i, _filenames[i]);
     }
@@ -201,7 +206,7 @@ esp_err_t TimeLogFileManager::deleteInvalidFiles() {
     }
 
     ESP_LOGI(TAG, "Purga completada. Archivos eliminados: %u", ctx.deletedCount);
-    return ESP_OK;
+    return OK;
 }
 
 /**
@@ -295,13 +300,6 @@ bool getDataTimestamp(const char* timestamp, uint16_t* outYear, uint32_t* outSes
     return true;
 }
 
-
-
-/**
- * @brief Crea una nueva carpeta de año dentro de /LOGS y actualiza el entorno de trabajo.
- * @param year Entero con el año de 4 dígitos (ej: 2027).
- * @return ESP_OK si se creó con éxito, o el código de error correspondiente.
- */
 esp_err_t TimeLogFileManager::newYearFile(uint16_t year) {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
     if (year < 2026 || year > 2100) { 
@@ -322,6 +320,12 @@ esp_err_t TimeLogFileManager::newYearFile(uint16_t year) {
     return ESP_OK;
 }
 
+
+/**
+ * @brief Crea una nueva carpeta de año dentro de /LOGS y actualiza el entorno de trabajo.
+ * @param year Entero con el año de 4 dígitos (ej: 2027).
+ * @return ESP_OK si se creó con éxito, o el código de error correspondiente.
+ */
 esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
     if (!_initialized || strlen(_baseYearPath) == 0) return ESP_ERR_DL_NOT_INIT;
     if (!timestamp || strlen(timestamp) == 0) return ESP_ERR_INVALID_ARG;
@@ -334,7 +338,6 @@ esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    // --- CONTROL DE LÍNEA DE TIEMPO (Causalidad) ---
     if (incomingYear < _intLastYearLog) {
         ESP_LOGE(TAG, "Rechazado: Año entrante (%u) es más antiguo que el último log (%u).", incomingYear, _intLastYearLog);
         return ESP_ERR_DL_PAST_TIME; 
@@ -347,7 +350,7 @@ esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
         err = setLastEnvironment(true); 
         if (err != ESP_OK) return err; 
     } 
-    else { // Mismo año
+    else { 
         if (incomingTimestamp <= _intLastTimestampLog) {
             ESP_LOGE(TAG, "Rechazado: Timestamp entrante (%u) no es mayor que el último registrado (%u).", incomingTimestamp, _intLastTimestampLog);
             return ESP_ERR_DL_PAST_TIME; 
@@ -355,10 +358,10 @@ esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
     }
 
     char newFilePath[FILE_NAME_SIZE];
-    snprintf(newFilePath, sizeof(newFilePath), "%s/%08u.csv", _baseYearPath, incomingTimestamp);
+    // 🚀 Cambiado: Concatenamos automáticamente el literal "%s/%08u" con la macro LOG_FILE_EXT
+    snprintf(newFilePath, sizeof(newFilePath), "%s/%08u" LOG_FILE_EXT, _baseYearPath, incomingTimestamp);
     ESP_LOGI(TAG, "Aprobada la creación de nuevo log: %s", newFilePath);
 
-    // --- ROTACIÓN DE ARCHIVOS ---
     if (_fileCount >= _userMaxFiles) {
         uint16_t oldestIndex = _fileCount - 1; 
         ESP_LOGW(TAG, "Capacidad máxima alcanzada. Rotando archivo antiguo: %s", _filenames[oldestIndex]);
@@ -378,7 +381,6 @@ esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
         return createErr;
     }
 
-    // Desplazar índice en memoria RAM
     for (int i = _fileCount; i > 0; i--) {
         strncpy(_filenames[i], _filenames[i - 1], FILE_NAME_SIZE);
     }
@@ -415,7 +417,7 @@ esp_err_t TimeLogFileManager::setErrorLog() {
 
 // Callback auxiliar estático y privado (puedes ponerlo justo arriba de appendErrorLog)
 // Se encarga de escribir la línea de texto directamente en el archivo abierto por el SDManager
-void writeErrorCallback(Stream& stream, void* context) {
+static void writeErrorCallback(Stream& stream, void* context) {
     if (context) {
         const char* errorLine = (const char*)context;
         stream.print(errorLine);
@@ -438,7 +440,6 @@ esp_err_t TimeLogFileManager::appendErrorLog(const char* timestamp, const char* 
     char tempLine[512];
     snprintf(tempLine, sizeof(tempLine), "%s;%s\n", timestamp, err_message);
 
-    // Si tu framework devuelve true en éxito, invierte la lógica adecuadamente según la firma de _sd->withFileWrite
     bool success = !_sd->withFileWrite(PATH_ERR_LOG, writeErrorCallback, tempLine);
     if (!success) {
         ESP_LOGE(TAG, "Fallo al escribir en el archivo de errores.");

@@ -4,10 +4,11 @@
 
 #include "ILogFileManager.h"
 #include "SDManager.h"
-#include <esp_err.h>
 
 #define DIR_LOG_NAME "/B_LOGS"
 #define FILE_NAME_SIZE 32
+
+#define LOG_FILE_EXT   ".csv"
 
 class BasicLogFileManager : public ILogFileManager {
 private:
