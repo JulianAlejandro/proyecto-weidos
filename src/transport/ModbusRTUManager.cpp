@@ -1,5 +1,4 @@
 #include "ModbusRTUManager.h"
-#include "../Debug.h"
 
 static const char* TAG = "MB_RTU_MGR";
 
@@ -28,12 +27,12 @@ void ModbusRTUManager::setPins(int tx, int de, int re) {
  * @brief Sets up the RS485 flow control and starts the serial client.
  */
 esp_err_t ModbusRTUManager::begin() {
-    MY_LOGI(TAG, "Iniciando RTU (RS485) a %d bps...", _baudrate);
+    ESP_LOGI(TAG, "Iniciando RTU (RS485) a %d bps...", _baudrate);
     
     RS485.setPins(_txPin, _dePin, _rePin);
     
     if (!ModbusRTUClient.begin(_baudrate, _config)) {
-        MY_LOGE(TAG, "Error crítico: No se pudo inicializar ModbusRTUClient (¿Puerto ocupado?)");
+        ESP_LOGE(TAG, "Error crítico: No se pudo inicializar ModbusRTUClient (¿Puerto ocupado?)");
         return ESP_ERR_MODBUS_NOT_READY;
     }
     
@@ -55,7 +54,7 @@ esp_err_t ModbusRTUManager::requestFrom(int slaveAddress, int type, uint16_t add
     if (!ModbusRTUClient.requestFrom(slaveAddress, type, address, nb)) {
         // En RTU, un fallo suele ser por Timeout (el esclavo no responde)
         // o por CRC Error (ruido en el cable).
-        MY_LOGE(TAG, "Error RTU: Fallo en petición a esclavo %d (Addr: 0x%04X)", slaveAddress, address);
+        ESP_LOGE(TAG, "Error RTU: Fallo en petición a esclavo %d (Addr: 0x%04X)", slaveAddress, address);
         
         // El cliente de ArduinoModbus no diferencia internamente entre CRC y Timeout,
         // pero por estadística en RS485 solemos reportar Timeout si no hay respuesta válida.
@@ -90,7 +89,7 @@ esp_err_t ModbusRTUManager::readCoils(int address, int quantity) {
  */
 esp_err_t ModbusRTUManager::writeHoldingRegister(uint16_t address, uint16_t value) {
     if (!ModbusRTUClient.holdingRegisterWrite(_slaveID, address, value)) {
-        MY_LOGE(TAG, "Error RTU: Fallo al escribir Holding Reg @ 0x%04X", address);
+        ESP_LOGE(TAG, "Error RTU: Fallo al escribir Holding Reg @ 0x%04X", address);
         return ESP_ERR_MODBUS_TIMEOUT;
     }
     return ESP_OK;
@@ -101,7 +100,7 @@ esp_err_t ModbusRTUManager::writeHoldingRegister(uint16_t address, uint16_t valu
  */
 esp_err_t ModbusRTUManager::writeCoil(uint16_t address, bool value) {
     if (!ModbusRTUClient.coilWrite(_slaveID, address, value)) {
-        MY_LOGE(TAG, "Error RTU: Fallo al escribir Coil @ 0x%04X", address);
+        ESP_LOGE(TAG, "Error RTU: Fallo al escribir Coil @ 0x%04X", address);
         return ESP_ERR_MODBUS_TIMEOUT;
     }
     return ESP_OK;

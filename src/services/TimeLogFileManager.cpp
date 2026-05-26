@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <vector>
 #include <string>
-#include "../Debug.h"
 
 static const char* TAG = "DATA_MGR";
 
@@ -29,24 +28,24 @@ void TimeLogFileManager::setMaxFiles(uint16_t maxFiles) {
 
 esp_err_t TimeLogFileManager::begin() {
     if (!_sd || !_sd->isReady()) {
-        MY_LOGE(TAG, "begin: SD Manager no está listo o es nulo.");
+        ESP_LOGE(TAG, "begin: SD Manager no está listo o es nulo.");
         return ESP_ERR_SD_NOT_INIT; 
     }
 
     esp_err_t err = _sd->createDirectory(DIR_LOG_NAME);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "begin: Error al crear directorio raíz %s [0x%X]", DIR_LOG_NAME, err);
+        ESP_LOGE(TAG, "begin: Error al crear directorio raíz %s [0x%X]", DIR_LOG_NAME, err);
         return err; 
     }
 
     err = setErrorLog(); 
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "begin: Error al asegurar el log de errores [0x%X]", err);
+        ESP_LOGE(TAG, "begin: Error al asegurar el log de errores [0x%X]", err);
         return err;
     }
 
     _initialized = true; 
-    MY_LOGI(TAG, "Datalogger inicializado correctamente.");
+    ESP_LOGI(TAG, "Datalogger inicializado correctamente.");
     return ESP_OK; 
 }
 
@@ -72,24 +71,24 @@ esp_err_t TimeLogFileManager::setLastSesion() {
     esp_err_t err = _sd->listDirectory(DIR_LOG_NAME, buscarAnioMasRecienteCallback, &maxYearFound);
 
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "setLastSesion: Fallo al escanear directorio %s. Err: 0x%X", DIR_LOG_NAME, err);
+        ESP_LOGE(TAG, "setLastSesion: Fallo al escanear directorio %s. Err: 0x%X", DIR_LOG_NAME, err);
         return err;
     }
 
     if (maxYearFound == 0) {
         maxYearFound = DEFAULT_YEAR; 
-        MY_LOGW(TAG, "setLastSesion: No se hallaron sesiones. Forzando entorno inicial en %d", maxYearFound);
+        ESP_LOGW(TAG, "setLastSesion: No se hallaron sesiones. Forzando entorno inicial en %d", maxYearFound);
     }
 
     snprintf(_baseYearPath, sizeof(_baseYearPath), "%s/%d", DIR_LOG_NAME, maxYearFound);
 
     err = _sd->createDirectory(_baseYearPath);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "setLastSesion: Fallo crítico creando %s. Err: 0x%X", _baseYearPath, err);
+        ESP_LOGE(TAG, "setLastSesion: Fallo crítico creando %s. Err: 0x%X", _baseYearPath, err);
         return err;
     }
 
-    MY_LOGI(TAG, "Entorno de trabajo fijado en: %s", _baseYearPath);
+    ESP_LOGI(TAG, "Entorno de trabajo fijado en: %s", _baseYearPath);
     return ESP_OK;
 }
 
@@ -102,7 +101,7 @@ void TimeLogFileManager::getSesionFilenamesCallback(const char* fileName, bool i
     shortName = (shortName) ? shortName + 1 : fileName;
 
     size_t len = strlen(shortName);
-    MY_LOGD(TAG, "Evaluando archivo detectado: %s", shortName);
+    ESP_LOGD(TAG, "Evaluando archivo detectado: %s", shortName);
 
     if (len == 12) { // MMDDHHMM.csv
         std::string nameStr(shortName);
@@ -110,7 +109,7 @@ void TimeLogFileManager::getSesionFilenamesCallback(const char* fileName, bool i
 
         if (nameStr.rfind(".csv") != std::string::npos) {
             fileList->push_back(shortName);
-            MY_LOGD(TAG, "-> ¡Archivo VALIDO añadido!: %s", shortName);
+            ESP_LOGD(TAG, "-> ¡Archivo VALIDO añadido!: %s", shortName);
         }
     }
 }
@@ -125,12 +124,12 @@ esp_err_t TimeLogFileManager::setFilesLastSesion() {
 
     esp_err_t err = _sd->listDirectory(_baseYearPath, getSesionFilenamesCallback, &foundFiles);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "setFilesLastSesion: Error al listar archivos en %s. Err: 0x%X", _baseYearPath, err);
+        ESP_LOGE(TAG, "setFilesLastSesion: Error al listar archivos en %s. Err: 0x%X", _baseYearPath, err);
         return err;
     }
 
     if (foundFiles.empty()) {
-        MY_LOGI(TAG, "No se encontraron archivos de log (.csv) en %s", _baseYearPath);
+        ESP_LOGI(TAG, "No se encontraron archivos de log (.csv) en %s", _baseYearPath);
         return ESP_OK;
     }
 
@@ -143,9 +142,9 @@ esp_err_t TimeLogFileManager::setFilesLastSesion() {
         _fileCount++;
     }
 
-    MY_LOGI(TAG, "Indexados %d archivos .csv más recientes.", _fileCount);
+    ESP_LOGI(TAG, "Indexados %d archivos .csv más recientes.", _fileCount);
     for (uint16_t i = 0; i < _fileCount; i++) {
-        MY_LOGD(TAG, "Indexado [%d]: %s", i, _filenames[i]);
+        ESP_LOGD(TAG, "Indexado [%d]: %s", i, _filenames[i]);
     }
 
     return ESP_OK;
@@ -179,12 +178,12 @@ void TimeLogFileManager::deleteInvalidFilesCallback(const char* fileName, bool i
     }
 
     if (!isFileValid) {
-        MY_LOGI(TAG, "Eliminando archivo obsoleto o no indexado: %s", fullPath);
+        ESP_LOGI(TAG, "Eliminando archivo obsoleto o no indexado: %s", fullPath);
         esp_err_t err = self->_sd->deleteFile(fullPath);
         if (err == ESP_OK) {
             ctx->deletedCount++;
         } else {
-            MY_LOGE(TAG, "No se pudo borrar físicamente: %s. Err: 0x%X", fullPath, err);
+            ESP_LOGE(TAG, "No se pudo borrar físicamente: %s. Err: 0x%X", fullPath, err);
         }
     }
 }
@@ -192,16 +191,16 @@ void TimeLogFileManager::deleteInvalidFilesCallback(const char* fileName, bool i
 esp_err_t TimeLogFileManager::deleteInvalidFiles() {
     if (!_initialized || strlen(_baseYearPath) == 0) return ESP_ERR_DL_NOT_INIT;
 
-    MY_LOGI(TAG, "Iniciando purga de archivos no indexados en: %s", _baseYearPath);
+    ESP_LOGI(TAG, "Iniciando purga de archivos no indexados en: %s", _baseYearPath);
 
     DeleteContext ctx = { .instance = this, .deletedCount = 0 };
     esp_err_t err = _sd->listDirectory(_baseYearPath, deleteInvalidFilesCallback, &ctx);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "Error en directorio durante la purga. Err: 0x%X", err);
+        ESP_LOGE(TAG, "Error en directorio durante la purga. Err: 0x%X", err);
         return err;
     }
 
-    MY_LOGI(TAG, "Purga completada. Archivos eliminados: %u", ctx.deletedCount);
+    ESP_LOGI(TAG, "Purga completada. Archivos eliminados: %u", ctx.deletedCount);
     return ESP_OK;
 }
 
@@ -213,13 +212,13 @@ void TimeLogFileManager::setLastLogTime() {
     if (_currentLogFile[0] == '\0') {
         _intLastYearLog = 0;
         _intLastTimestampLog = 0;
-        MY_LOGI(TAG, "setLastLogTime: No hay log activo previo. Línea de tiempo en 0.");
+        ESP_LOGI(TAG, "setLastLogTime: No hay log activo previo. Línea de tiempo en 0.");
         return;
     }
 
     const char* lastSlash = strrchr(_currentLogFile, '/');
     if (lastSlash == nullptr) {
-        MY_LOGE(TAG, "setLastLogTime: Formato de ruta inválido (%s)", _currentLogFile);
+        ESP_LOGE(TAG, "setLastLogTime: Formato de ruta inválido (%s)", _currentLogFile);
         return;
     }
 
@@ -238,7 +237,7 @@ void TimeLogFileManager::setLastLogTime() {
     tokenTimestamp[8] = '\0';
     _intLastTimestampLog = (uint32_t)strtoul(tokenTimestamp, nullptr, 10);
 
-    MY_LOGI(TAG, "Último histórico detectado en SD -> Año: %u | Timestamp: %u", _intLastYearLog, _intLastTimestampLog);
+    ESP_LOGI(TAG, "Último histórico detectado en SD -> Año: %u | Timestamp: %u", _intLastYearLog, _intLastTimestampLog);
 }
 
 esp_err_t TimeLogFileManager::setLastEnvironment(bool delete_rest) {
@@ -250,10 +249,10 @@ esp_err_t TimeLogFileManager::setLastEnvironment(bool delete_rest) {
 
     if (_fileCount > 0) {
         snprintf(_currentLogFile, sizeof(_currentLogFile), "%s", _filenames[0]);
-        MY_LOGI(TAG, "Log actual fijado en el más reciente: %s", _currentLogFile);
+        ESP_LOGI(TAG, "Log actual fijado en el más reciente: %s", _currentLogFile);
     } else {
         _currentLogFile[0] = '\0';
-        MY_LOGI(TAG, "Carpeta vacía. _currentLogFile inicializado vacío.");
+        ESP_LOGI(TAG, "Carpeta vacía. _currentLogFile inicializado vacío.");
     }
     
     setLastLogTime(); 
@@ -272,13 +271,13 @@ bool getDataTimestamp(const char* timestamp, uint16_t* outYear, uint32_t* outSes
 
     size_t len = strlen(timestamp);
     if (len != 14) { 
-        MY_LOGE("TIMESTAMP_PARSE", "Longitud incorrecta: %d (Se esperan 14)", len);
+        ESP_LOGE("TIMESTAMP_PARSE", "Longitud incorrecta: %d (Se esperan 14)", len);
         return false;
     }
 
     for (size_t i = 0; i < 14; i++) { 
         if (timestamp[i] < '0' || timestamp[i] > '9') {
-            MY_LOGE("TIMESTAMP_PARSE", "Caracteres no numéricos detectados.");
+            ESP_LOGE("TIMESTAMP_PARSE", "Caracteres no numéricos detectados.");
             return false;
         }
     }
@@ -306,17 +305,17 @@ bool getDataTimestamp(const char* timestamp, uint16_t* outYear, uint32_t* outSes
 esp_err_t TimeLogFileManager::newYearFile(uint16_t year) {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
     if (year < 2026 || year > 2100) { 
-        MY_LOGE(TAG, "newYearFile: Año fuera de rango (%u)", year);
+        ESP_LOGE(TAG, "newYearFile: Año fuera de rango (%u)", year);
         return ESP_ERR_INVALID_ARG;
     }
 
     char newYearPath[FILE_NAME_SIZE];
     snprintf(newYearPath, sizeof(newYearPath), "%s/%u", DIR_LOG_NAME, year);
 
-    MY_LOGI(TAG, "Creando directorio para nuevo año: %s", newYearPath);
+    ESP_LOGI(TAG, "Creando directorio para nuevo año: %s", newYearPath);
     esp_err_t err = _sd->createDirectory(newYearPath);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "Fallo crítico al crear directorio: %s. Err: 0x%X", newYearPath, err);
+        ESP_LOGE(TAG, "Fallo crítico al crear directorio: %s. Err: 0x%X", newYearPath, err);
         return err;
     }
 
@@ -331,17 +330,17 @@ esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
     uint32_t incomingTimestamp = 0; 
 
     if (!getDataTimestamp(timestamp, &incomingYear, &incomingTimestamp)) {
-        MY_LOGE(TAG, "newFileLog: Error de parseo en timestamp: %s", timestamp);
+        ESP_LOGE(TAG, "newFileLog: Error de parseo en timestamp: %s", timestamp);
         return ESP_ERR_INVALID_ARG;
     }
 
     // --- CONTROL DE LÍNEA DE TIEMPO (Causalidad) ---
     if (incomingYear < _intLastYearLog) {
-        MY_LOGE(TAG, "Rechazado: Año entrante (%u) es más antiguo que el último log (%u).", incomingYear, _intLastYearLog);
+        ESP_LOGE(TAG, "Rechazado: Año entrante (%u) es más antiguo que el último log (%u).", incomingYear, _intLastYearLog);
         return ESP_ERR_DL_PAST_TIME; 
     } 
     else if (incomingYear > _intLastYearLog) {
-        MY_LOGI(TAG, "Cambio de año detectado de forma síncrona (%u -> %u).", _intLastYearLog, incomingYear);
+        ESP_LOGI(TAG, "Cambio de año detectado de forma síncrona (%u -> %u).", _intLastYearLog, incomingYear);
         esp_err_t err = newYearFile(incomingYear); 
         if (err != ESP_OK) return err;
 
@@ -350,23 +349,23 @@ esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
     } 
     else { // Mismo año
         if (incomingTimestamp <= _intLastTimestampLog) {
-            MY_LOGE(TAG, "Rechazado: Timestamp entrante (%u) no es mayor que el último registrado (%u).", incomingTimestamp, _intLastTimestampLog);
+            ESP_LOGE(TAG, "Rechazado: Timestamp entrante (%u) no es mayor que el último registrado (%u).", incomingTimestamp, _intLastTimestampLog);
             return ESP_ERR_DL_PAST_TIME; 
         }
     }
 
     char newFilePath[FILE_NAME_SIZE];
     snprintf(newFilePath, sizeof(newFilePath), "%s/%08u.csv", _baseYearPath, incomingTimestamp);
-    MY_LOGI(TAG, "Aprobada la creación de nuevo log: %s", newFilePath);
+    ESP_LOGI(TAG, "Aprobada la creación de nuevo log: %s", newFilePath);
 
     // --- ROTACIÓN DE ARCHIVOS ---
     if (_fileCount >= _userMaxFiles) {
         uint16_t oldestIndex = _fileCount - 1; 
-        MY_LOGW(TAG, "Capacidad máxima alcanzada. Rotando archivo antiguo: %s", _filenames[oldestIndex]);
+        ESP_LOGW(TAG, "Capacidad máxima alcanzada. Rotando archivo antiguo: %s", _filenames[oldestIndex]);
 
         esp_err_t delErr = _sd->deleteFile(_filenames[oldestIndex]);
         if (delErr != ESP_OK) {
-            MY_LOGE(TAG, "Fallo al eliminar archivo antiguo en rotación. Err: 0x%X", delErr);
+            ESP_LOGE(TAG, "Fallo al eliminar archivo antiguo en rotación. Err: 0x%X", delErr);
             return delErr;
         }
         memset(_filenames[oldestIndex], 0, FILE_NAME_SIZE);
@@ -375,7 +374,7 @@ esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
 
     esp_err_t createErr = _sd->createFile(newFilePath);
     if (createErr != ESP_OK) {
-        MY_LOGE(TAG, "Fallo al crear archivo en SD: %s. Err: 0x%X", newFilePath, createErr);
+        ESP_LOGE(TAG, "Fallo al crear archivo en SD: %s. Err: 0x%X", newFilePath, createErr);
         return createErr;
     }
 
@@ -391,7 +390,7 @@ esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
     _intLastYearLog = incomingYear;
     _intLastTimestampLog = incomingTimestamp;
 
-    MY_LOGI(TAG, "Nuevo archivo activo: %s. Línea de tiempo actualizada.", _currentLogFile);
+    ESP_LOGI(TAG, "Nuevo archivo activo: %s. Línea de tiempo actualizada.", _currentLogFile);
     return ESP_OK;
 }
 
@@ -405,10 +404,10 @@ esp_err_t TimeLogFileManager::setErrorLog() {
         return ESP_OK;
     }
 
-    MY_LOGI(TAG, "Creando archivo de logs de errores en: %s", PATH_ERR_LOG);
+    ESP_LOGI(TAG, "Creando archivo de logs de errores en: %s", PATH_ERR_LOG);
     esp_err_t err = _sd->createFile(PATH_ERR_LOG);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "No se pudo inicializar la ruta de errores. Err: 0x%X", err);
+        ESP_LOGE(TAG, "No se pudo inicializar la ruta de errores. Err: 0x%X", err);
         return err;
     }
     return ESP_OK;
@@ -442,11 +441,11 @@ esp_err_t TimeLogFileManager::appendErrorLog(const char* timestamp, const char* 
     // Si tu framework devuelve true en éxito, invierte la lógica adecuadamente según la firma de _sd->withFileWrite
     bool success = !_sd->withFileWrite(PATH_ERR_LOG, writeErrorCallback, tempLine);
     if (!success) {
-        MY_LOGE(TAG, "Fallo al escribir en el archivo de errores.");
+        ESP_LOGE(TAG, "Fallo al escribir en el archivo de errores.");
         return ESP_ERR_SD_WRITE_FAIL; 
     }
 
-    MY_LOGW(TAG, "Error persistido en SD: %s", tempLine);
+    ESP_LOGW(TAG, "Error persistido en SD: %s", tempLine);
     return ESP_OK;
 }
 

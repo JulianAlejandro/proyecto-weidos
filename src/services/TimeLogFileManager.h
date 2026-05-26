@@ -4,7 +4,7 @@
 #include "ILogFileManager.h"
 #include "SDManager.h"
 
-#include <esp_log.h> // <-- Cambiamos Serial por ESP_LOG
+//#include <esp_log.h> // <-- Cambiamos Serial por ESP_LOG
 
 #define FILE_NAME_SIZE 32 
 #define DIR_LOG_NAME "/LOGS"

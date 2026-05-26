@@ -1,7 +1,6 @@
 #include "Datalogger.h"
 #include <cstring>
 #include <cstdio>
-#include "../Debug.h"
 
 static const char* TAG = "DATALOGGER";
 
@@ -12,21 +11,21 @@ Datalogger::Datalogger(SDManager* sdManager, ILogFileManager* fileManager)
 
 esp_err_t Datalogger::begin() {
     if (_sd == nullptr || !_sd->isReady() || _fileManager == nullptr) { // validación extra de puntero
-        MY_LOGE(TAG, "begin: Dependencias no asignadas o SD no lista.");
+        ESP_LOGE(TAG, "begin: Dependencias no asignadas o SD no lista.");
         return ESP_ERR_SD_NOT_INIT;
     }
 
     // 1. Inicializamos el gestor de archivos interno
     esp_err_t err = _fileManager->begin();
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "begin: Falló inicialización de FileManager [0x%X]", err);
+        ESP_LOGE(TAG, "begin: Falló inicialización de FileManager [0x%X]", err);
         return err; 
     }
 
     // 2. Escaneamos la SD para recuperar el último entorno de trabajo
     err = _fileManager->setLastEnvironment(true); 
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "begin: Falló al establecer el entorno de logs [0x%X]", err);
+        ESP_LOGE(TAG, "begin: Falló al establecer el entorno de logs [0x%X]", err);
         return err; 
     }
 
@@ -48,18 +47,18 @@ esp_err_t Datalogger::begin() {
             if (_currentFileSizeBytes >= MAX_FILE_SIZE_BYTES) { 
                 _fileLimitReached = true;
             }
-            MY_LOGI(TAG, "Archivo previo recuperado: %s (%u bytes).", _logPath, _currentFileSizeBytes);
+            ESP_LOGI(TAG, "Archivo previo recuperado: %s (%u bytes).", _logPath, _currentFileSizeBytes);
         } else {
             // Por seguridad, si falla la lectura física, asumimos 0 para evitar punteros corruptos
             _currentFileSizeBytes = 0; 
-            MY_LOGW(TAG, "No se pudo leer tamaño de %s. Inicializado en 0 por seguridad. Err: 0x%X", _logPath, err);
+            ESP_LOGW(TAG, "No se pudo leer tamaño de %s. Inicializado en 0 por seguridad. Err: 0x%X", _logPath, err);
         }
 
     } else {
         _logPath[0] = '\0';
         _currentFileSizeBytes = 0;
         _fileLimitReached = false;
-        MY_LOGI(TAG, "Entorno inicializado limpio (sin logs previos en la carpeta).");
+        ESP_LOGI(TAG, "Entorno inicializado limpio (sin logs previos en la carpeta).");
     }
 
     _initialized = true;
@@ -80,7 +79,7 @@ esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char*
 
     // Si el buffer tiene datos rezagados del archivo anterior, los forzamos a guardarse
     if (_buffer.getCurrentSize() > 0 && _logPath[0] != '\0') {
-        MY_LOGI(TAG, "Vaciando buffer remanente antes de abrir nueva sesión...");
+        ESP_LOGI(TAG, "Vaciando buffer remanente antes de abrir nueva sesión...");
         esp_err_t flushErr = flushBuffer();
         if (flushErr != ESP_OK) return flushErr;
     }
@@ -93,7 +92,7 @@ esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char*
         err = _fileManager->newFileLog();
     }
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "No se pudo generar el nuevo archivo de log en FileManager [0x%X]", err);
+        ESP_LOGE(TAG, "No se pudo generar el nuevo archivo de log en FileManager [0x%X]", err);
         return err;
     }
 
@@ -167,7 +166,7 @@ esp_err_t Datalogger::flushBuffer() {
     }
 
     size_t bytesToWrite = _buffer.getCurrentSize();
-    MY_LOGD(TAG, "Volcando %d bytes de RAM a SD en: %s", bytesToWrite, _logPath);
+    ESP_LOGD(TAG, "Volcando %d bytes de RAM a SD en: %s", bytesToWrite, _logPath);
     
     // Ejecución de la escritura por bloque síncrono
     bool failed = _sd->withFileWrite(_logPath, flushLogBufferCallback, &_buffer);
@@ -177,7 +176,7 @@ esp_err_t Datalogger::flushBuffer() {
         _buffer.clear(); 
         return ESP_OK;
     } else {
-        MY_LOGE(TAG, "Error de escritura física en archivo: %s", _logPath);
+        ESP_LOGE(TAG, "Error de escritura física en archivo: %s", _logPath);
         return ESP_ERR_SD_WRITE_FAIL;
     }
 }
@@ -192,7 +191,7 @@ esp_err_t Datalogger::m_pushToBuffer(const char* csvLine) {
 
     // Validación de límites de tamaño para prevenir desbordamientos en la partición SD
     if (projectedSize > MAX_FILE_SIZE_BYTES) {
-        MY_LOGW(TAG, "Límite de tamaño de archivo alcanzado (%u bytes). Forzando cierre de bloque.", MAX_FILE_SIZE_BYTES);
+        ESP_LOGW(TAG, "Límite de tamaño de archivo alcanzado (%u bytes). Forzando cierre de bloque.", MAX_FILE_SIZE_BYTES);
         
         // Volcado de emergencia de lo que se pueda salvar en el buffer actual
         flushBuffer();
@@ -205,7 +204,7 @@ esp_err_t Datalogger::m_pushToBuffer(const char* csvLine) {
     if (lineLength > _buffer.getAvailableSpace()) {
         esp_err_t err = flushBuffer();
         if (err != ESP_OK) {
-            MY_LOGE(TAG, "m_pushToBuffer: Imposible liberar espacio en RAM por fallo de SD.");
+            ESP_LOGE(TAG, "m_pushToBuffer: Imposible liberar espacio en RAM por fallo de SD.");
             return err;
         }
     }

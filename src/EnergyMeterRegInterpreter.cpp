@@ -3,7 +3,7 @@
 #include "devices/EnergyMeter750.h"
 #include "services/Datalogger.h"
 #include <RTClib.h>
-#include "Debug.h"
+
 
 /**
  * @struct StreamContext
@@ -553,7 +553,7 @@ esp_err_t EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_
     esp_err_t err = em->executeRequest(req);
     
     if (err != ESP_OK) {
-        MY_LOGE("INTERP", "Fallo Modbus: 0x%X", err);
+        ESP_LOGE("INTERP", "Fallo Modbus: 0x%X", err);
         return err; // No intentamos procesar datos basura
     }
 

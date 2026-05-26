@@ -5,7 +5,6 @@
 #include "ILogFileManager.h"
 #include "LogBuffer.h"
 #include <esp_err.h>
-#include <esp_log.h>
 
 #define MAX_LOGS 4
 #define FILE_TEXT_SIZE 32 

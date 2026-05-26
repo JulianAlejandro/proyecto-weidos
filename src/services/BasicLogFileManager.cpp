@@ -1,7 +1,6 @@
 #include "BasicLogFileManager.h"
 #include <cstdio>
 #include <cstring>
-#include "../Debug.h"
 
 static const char* TAG = "BASIC_FILE_MGR";
 
@@ -17,24 +16,24 @@ void BasicLogFileManager::setMaxFiles(uint16_t maxFiles) {
 
 esp_err_t BasicLogFileManager::begin() {
     if (!_sd || !_sd->isReady()) {
-        MY_LOGE(TAG, "begin: SD Manager no está listo o es nulo.");
+        ESP_LOGE(TAG, "begin: SD Manager no está listo o es nulo.");
         return ESP_ERR_SD_NOT_INIT; 
     }
 
     esp_err_t err = _sd->createDirectory(DIR_LOG_NAME);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "begin: Error al crear directorio raíz %s [0x%X]", DIR_LOG_NAME, err);
+        ESP_LOGE(TAG, "begin: Error al crear directorio raíz %s [0x%X]", DIR_LOG_NAME, err);
         return err; 
     }
 /*
     err = setErrorLog(); 
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "begin: Error al asegurar el log de errores [0x%X]", err);
+        ESP_LOGE(TAG, "begin: Error al asegurar el log de errores [0x%X]", err);
         return err;
     }
 */
     _initialized = true; 
-    MY_LOGI(TAG, "Datalogger inicializado correctamente.");
+    ESP_LOGI(TAG, "Datalogger inicializado correctamente.");
     return ESP_OK; 
 }
 
@@ -71,7 +70,7 @@ esp_err_t BasicLogFileManager::setLastSesion() {
     // Escaneamos la carpeta usando nuestro callback
     esp_err_t err = _sd->listDirectory(DIR_LOG_NAME, buscarContadorMasAltoCallback, &maxEncontrado);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "setLastSesion: Error listando directorio %s [0x%X]", DIR_LOG_NAME, err);
+        ESP_LOGE(TAG, "setLastSesion: Error listando directorio %s [0x%X]", DIR_LOG_NAME, err);
         return err;
     }
 
@@ -79,12 +78,12 @@ esp_err_t BasicLogFileManager::setLastSesion() {
     _fileCount = maxEncontrado;
 
     if (_fileCount == 0) {
-        MY_LOGI(TAG, "setLastSesion: No se encontraron logs previos. Próximo será el 1.");
+        ESP_LOGI(TAG, "setLastSesion: No se encontraron logs previos. Próximo será el 1.");
         _currentLogFile[0] = '\0';
     } else {
         // Reconstruimos la ruta del archivo más reciente encontrado
         snprintf(_currentLogFile, sizeof(_currentLogFile), "%s/LOG%05u.txt", DIR_LOG_NAME, _fileCount);
-        MY_LOGI(TAG, "Última sesión recuperada con éxito: %s (Contador: %u)", _currentLogFile, _fileCount);
+        ESP_LOGI(TAG, "Última sesión recuperada con éxito: %s (Contador: %u)", _currentLogFile, _fileCount);
     }
 
     return ESP_OK;
@@ -108,12 +107,12 @@ esp_err_t BasicLogFileManager::setLastSesion() {
 
     esp_err_t err = _sd->listDirectory(_baseYearPath, getSesionFilenamesCallback, &foundFiles);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "setFilesLastSesion: Error al listar archivos en %s. Err: 0x%X", _baseYearPath, err);
+        ESP_LOGE(TAG, "setFilesLastSesion: Error al listar archivos en %s. Err: 0x%X", _baseYearPath, err);
         return err;
     }
 
     if (foundFiles.empty()) {
-        MY_LOGI(TAG, "No se encontraron archivos de log (.txt) en %s", _baseYearPath);
+        ESP_LOGI(TAG, "No se encontraron archivos de log (.txt) en %s", _baseYearPath);
         return ESP_OK;
     }
 
@@ -126,9 +125,9 @@ esp_err_t BasicLogFileManager::setLastSesion() {
         _fileCount++;
     }
 
-    MY_LOGI(TAG, "Indexados %d archivos .txt más recientes.", _fileCount);
+    ESP_LOGI(TAG, "Indexados %d archivos .txt más recientes.", _fileCount);
     for (uint16_t i = 0; i < _fileCount; i++) {
-        MY_LOGD(TAG, "Indexado [%d]: %s", i, _filenames[i]);
+        ESP_LOGD(TAG, "Indexado [%d]: %s", i, _filenames[i]);
     }
 
     return ESP_OK;
@@ -162,12 +161,12 @@ esp_err_t BasicLogFileManager::setLastSesion() {
     }
 
     if (!isFileValid) {
-        MY_LOGI(TAG, "Eliminando archivo obsoleto o no indexado: %s", fullPath);
+        ESP_LOGI(TAG, "Eliminando archivo obsoleto o no indexado: %s", fullPath);
         esp_err_t err = self->_sd->deleteFile(fullPath);
         if (err == ESP_OK) {
             ctx->deletedCount++;
         } else {
-            MY_LOGE(TAG, "No se pudo borrar físicamente: %s. Err: 0x%X", fullPath, err);
+            ESP_LOGE(TAG, "No se pudo borrar físicamente: %s. Err: 0x%X", fullPath, err);
         }
     }
     */
@@ -199,7 +198,7 @@ esp_err_t BasicLogFileManager::newFileLog(const char* timestamp) {
 
     // 2. Control de rotación simple: si supera el máximo configurado por usuario, volvemos a empezar en 1
    // if (_fileCount > _userMaxFiles) {
-     //   MY_LOGW(TAG, "Límite de archivos alcanzado (%u). Rotando contador al archivo 1.", _userMaxFiles);
+     //   ESP_LOGW(TAG, "Límite de archivos alcanzado (%u). Rotando contador al archivo 1.", _userMaxFiles);
      //   _fileCount = 1;
    // }
 
@@ -214,11 +213,11 @@ esp_err_t BasicLogFileManager::newFileLog(const char* timestamp) {
     // 5. Creamos el archivo físico limpio en la SD
     esp_err_t err = _sd->createFile(_currentLogFile);
     if (err != ESP_OK) {
-        MY_LOGE(TAG, "newFileLog: Error creando archivo %s [0x%X]", _currentLogFile, err);
+        ESP_LOGE(TAG, "newFileLog: Error creando archivo %s [0x%X]", _currentLogFile, err);
         return err;
     }
 
-    MY_LOGI(TAG, "Nuevo log activo creado con éxito: %s", _currentLogFile);
+    ESP_LOGI(TAG, "Nuevo log activo creado con éxito: %s", _currentLogFile);
     return ESP_OK;
 }
 

@@ -1,4 +1,5 @@
 
+/*
 #ifndef DEBUG_H
 #define DEBUG_H
 
@@ -28,7 +29,7 @@ inline void my_log_level_set(uint8_t level) {
 #define MY_LOGV(tag, format, ...) do { if (g_my_log_current_level >= MY_LOG_LEVEL_VERBOSE) Serial.printf("[V][%s] " format "\n", tag, ##__VA_ARGS__); } while(0)
 
 #endif
-
+*/
 
 //#ifndef DEBUG_H
 //#define DEBUG_H

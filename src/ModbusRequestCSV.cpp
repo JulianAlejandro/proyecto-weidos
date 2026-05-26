@@ -1,6 +1,5 @@
 #include "ModbusRequestCSV.h"
 #include <CSV_Parser.h>
-#include "Debug.h"
 
 const char* ModbusRequestCSV::TAG = "MB_CSV";
 
@@ -45,7 +44,7 @@ esp_err_t ModbusRequestCSV::loadFromSDParameters() {
 
     int rows = cp.getRowsCount();
     if (rows < 3) {
-        MY_LOGE(TAG, "CSV insuficiente: se esperaban 3 filas, hay %d", rows);
+        ESP_LOGE(TAG, "CSV insuficiente: se esperaban 3 filas, hay %d", rows);
         return ESP_ERR_CONFIG_PARSE_FAIL;
     }
 
@@ -88,7 +87,7 @@ esp_err_t ModbusRequestCSV::loadFromSDMbrequest(Struct_MBRequest *out_request) {
 
     int rows = cp.getRowsCount();
     if (rows < 8) {
-        MY_LOGE(TAG, "Fila 8 de Modbus no encontrada. Filas totales: %d", rows);
+        ESP_LOGE(TAG, "Fila 8 de Modbus no encontrada. Filas totales: %d", rows);
         return ESP_ERR_CONFIG_PARSE_FAIL;
     }
 
