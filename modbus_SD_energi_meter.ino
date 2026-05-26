@@ -57,7 +57,8 @@ void loop() {
 #include "src/transport/ModbusRTUManager.h"
 
 // Core Services
-#include "src/services/BasicLogFileManager.h"
+//#include "src/services/BasicLogFileManager.h"
+#include "src/services/DataloggerFileManager.h"
 #include "src/services/Datalogger.h"
 #include "src/devices/EnergyMeter750.h"
 #include "src/services/SDManager.h"
@@ -76,8 +77,9 @@ void loop() {
 RTC_DS3231 rtc;
 SDManager sd; 
 
-BasicLogFileManager fileManager(&sd, 4); 
-Datalogger datalogger(&sd, &fileManager); 
+//BasicLogFileManager fileManager(&sd, 4);
+DataloggerFileManager fileManager(&sd, 4);
+Datalogger datalogger(&sd, &fileManager);
 
 EnergyMeterRegInterpreter regInterpreter(&sd); 
 EnergyMeter750 energy_meter; 
