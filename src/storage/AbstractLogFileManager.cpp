@@ -1,11 +1,16 @@
 #include "AbstractLogFileManager.h"
-//#include "esp_log.h"
+#include <cstdio>
+#include <cstring>
 
 static const char* TAG = "LOG_MGR";
 
-AbstractLogFileManager::AbstractLogFileManager(SDManager* sdManager, uint16_t maxFiles)
-    : _sd(sdManager), _userMaxFiles(maxFiles), _initialized(false){
+AbstractLogFileManager::AbstractLogFileManager(SDManager* sdManager, uint16_t maxFiles, const char* dirRoot)
+    : _sd(sdManager), _userMaxFiles(maxFiles), _initialized(false) {
     _currentLogFile[0] = '\0';
+    
+    // Almacenamos dinámicamente las rutas que nos pasa la clase hija
+    snprintf(_dirLogName, sizeof(_dirLogName), "%s", dirRoot);
+    snprintf(_pathErrLog, sizeof(_pathErrLog), "%s/ERROR", dirRoot);
 }
 
 void AbstractLogFileManager::setMaxFiles(uint16_t maxFiles) {
@@ -18,9 +23,9 @@ esp_err_t AbstractLogFileManager::begin() {
         return ESP_ERR_SD_NOT_INIT; 
     }
 
-    esp_err_t err = _sd->createDirectory(DIR_LOG_NAME);
+    esp_err_t err = _sd->createDirectory(_dirLogName);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "begin: Error al crear directorio raíz %s [0x%X]", DIR_LOG_NAME, err);
+        ESP_LOGE(TAG, "begin: Error al crear directorio raíz %s [0x%X]", _dirLogName, err);
         return err; 
     }
 
@@ -36,12 +41,12 @@ esp_err_t AbstractLogFileManager::begin() {
 }
 
 esp_err_t AbstractLogFileManager::setErrorLog() {
-    if (_sd->exists(PATH_ERR_LOG)) {
+    if (_sd->exists(_pathErrLog)) {
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Creando archivo de logs de errores en: %s", PATH_ERR_LOG);
-    esp_err_t err = _sd->createFile(PATH_ERR_LOG);
+    ESP_LOGI(TAG, "Creando archivo de logs de errores en: %s", _pathErrLog);
+    esp_err_t err = _sd->createFile(_pathErrLog);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "No se pudo inicializar la ruta de errores. Err: 0x%X", err);
         return err;
@@ -49,24 +54,7 @@ esp_err_t AbstractLogFileManager::setErrorLog() {
     return ESP_OK;
 }
 
-/*
-// inciar una sesion BASICA 
-esp_err_t AbstractLogFileManager::setLastEnvironment(bool delete_rest) {
-    //_currentLogFile[0] = 'algo?;
-    return ESP_OK; // NO HACE NADA EN ESTA CLASE PADRE
-}
-*/
 
-char* AbstractLogFileManager::getCurrentLogPath() {
-    return _currentLogFile;
-}
-
-/*
-esp_err_t AbstractLogFileManager::newFileLog(const char* timestamp) {
-    return ESP_OK;
-}
-
-*/
 
 static void writeErrorCallback(Stream& stream, void* context) {
     if (context) {
@@ -85,7 +73,7 @@ esp_err_t AbstractLogFileManager::appendErrorLog(const char* timestamp, const ch
     char tempLine[512];
     snprintf(tempLine, sizeof(tempLine), "%s;%s\n", timestamp, err_message);
 
-    bool success = !_sd->withFileWrite(PATH_ERR_LOG, writeErrorCallback, tempLine);
+    bool success = !_sd->withFileWrite(_pathErrLog, writeErrorCallback, tempLine);
     if (!success) {
         ESP_LOGE(TAG, "Fallo al escribir en el archivo de errores.");
         return ESP_ERR_SD_WRITE_FAIL; 
@@ -95,6 +83,10 @@ esp_err_t AbstractLogFileManager::appendErrorLog(const char* timestamp, const ch
     return ESP_OK;
 }
 
+
+char* AbstractLogFileManager::getCurrentLogPath() {
+    return _currentLogFile;
+}
 
 
 bool AbstractLogFileManager::requiresTimestamp() { 

@@ -83,7 +83,7 @@ void setup() {
         while(true);
     }
 
-    rtc.adjust(DateTime(2026, 5, 26, 17, 07, 1));
+    rtc.adjust(DateTime(2026, 5, 26, 18, 02, 1));
 
     esp_err_t err;
 
