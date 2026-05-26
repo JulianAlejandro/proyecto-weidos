@@ -3,7 +3,7 @@
 
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
-#include "../core/ModbusTransport.h" 
+#include "../core/IModbusTransport.h" 
 
 #define ESP_ERR_MODBUS_TCP_IP_NOT_FOUND (ESP_ERR_MODBUS_BASE + 101)
 #define ESP_ERR_MODBUS_TCP_SOCKET       (ESP_ERR_MODBUS_BASE + 102)
@@ -14,7 +14,7 @@
  * * This class manages Ethernet client connections, automatic reconnections, 
  * and standard Modbus TCP transactions.
  */
-class ModbusTCPManager : public ModbusTransport {
+class ModbusTCPManager : public IModbusTransport {
   private:
     IPAddress _serverIP;         ///< IP Address of the Modbus TCP Server/Slave
     uint16_t _port;              ///< TCP Port (Default is 502)

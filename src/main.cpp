@@ -1,73 +1,21 @@
-/*
 #include <RTClib.h>
 
 // Transport Layer implementations
-#include "src/transport/ModbusTCPManager.h" 
-#include "src/transport/ModbusRTUManager.h"
+#include "transport/ModbusTCPManager.h" 
+#include "transport/ModbusRTUManager.h"
 
 // Core Services
-#include "src/services/DataloggerFileManager.h"
-#include "src/services/Datalogger.h"
-#include "src/devices/EnergyMeter750.h"
-#include "src/services/SDManager.h"
+//#include "services/BasicLogFileManager.h"
+#include "services/TimeLogFileManager.h"
+#include "services/Datalogger.h"
+#include "devices/EnergyMeter750.h"
+#include "services/SDManager.h"
 
 // Logic and Configuration Managers
-#include "src/EnergyMeterRegInterpreter.h"
-#include "src/ModbusRequestCSV.h"
+#include "EnergyMeterRegInterpreter.h"
+#include "ModbusRequestCSV.h"
 
-#include "src/Debug.h"
-
-// Default Modbus Settings
-#define SLAVE_ADDRESS 1 
-#define MODBUS_PORT 502
-
-// Global Instances
-RTC_DS3231 rtc;
-SDManager sd; 
-
-DataloggerFileManager fileManager(&sd, 4); 
-Datalogger datalogger(&sd, &fileManager); 
-
-EnergyMeterRegInterpreter regInterpreter(&sd); 
-EnergyMeter750 energy_meter; 
-ModbusRequestCSV mb_csv(&sd);
-ModbusTransport* modbus = nullptr; // Polymorphic pointer for TCP or RTU
-
-uint8_t g_my_log_current_level = MY_LOG_LEVEL_VERBOSE; 
-
-
-void setup() {
-
-    Serial.begin(115200);
-    while(!Serial); 
-    
-}
-
-void loop() {
-
-    delay(1000); 
-}
-*/
-
-
-#include <RTClib.h>
-
-// Transport Layer implementations
-#include "src/transport/ModbusTCPManager.h" 
-#include "src/transport/ModbusRTUManager.h"
-
-// Core Services
-//#include "src/services/BasicLogFileManager.h"
-#include "src/services/DataloggerFileManager.h"
-#include "src/services/Datalogger.h"
-#include "src/devices/EnergyMeter750.h"
-#include "src/services/SDManager.h"
-
-// Logic and Configuration Managers
-#include "src/EnergyMeterRegInterpreter.h"
-#include "src/ModbusRequestCSV.h"
-
-#include "src/Debug.h"
+#include "Debug.h"
 
 // Default Modbus Settings
 #define SLAVE_ADDRESS 1 
@@ -78,13 +26,13 @@ RTC_DS3231 rtc;
 SDManager sd; 
 
 //BasicLogFileManager fileManager(&sd, 4);
-DataloggerFileManager fileManager(&sd, 4);
+TimeLogFileManager fileManager(&sd, 4);
 Datalogger datalogger(&sd, &fileManager);
 
 EnergyMeterRegInterpreter regInterpreter(&sd); 
 EnergyMeter750 energy_meter; 
 ModbusRequestCSV mb_csv(&sd);
-ModbusTransport* modbus = nullptr; // Polymorphic pointer for TCP or RTU
+IModbusTransport* modbus = nullptr; // Polymorphic pointer for TCP or RTU
 
 uint8_t g_my_log_current_level = MY_LOG_LEVEL_VERBOSE; 
 
@@ -140,7 +88,7 @@ void setup() {
         while(true);
     }
 
-    rtc.adjust(DateTime(2026, 5, 22, 13, 33, 1));
+    rtc.adjust(DateTime(2026, 5, 26, 11, 43, 1));
 
     esp_err_t err;
 
@@ -208,81 +156,59 @@ void loop() {
 
 
 
-/*
-#include "src/services/BasicLogFileManager.h"
-#include "src/services/SDManager.h"
-#include "src/Debug.h"
 
-SDManager sd; 
-BasicLogFileManager bFileManager(&sd, 4);
+/*
+
+#include <Arduino.h>
+
+#include "transport/ModbusTCPManager.h" 
+#include "transport/ModbusRTUManager.h"
+#include "devices/EnergyMeter750.h"
+#include "Debug.h"
+
+#define SLAVE_ADDRESS 1 
+#define MODBUS_PORT 502
+
+EnergyMeter750 energy_meter; 
+IModbusTransport* modbus = nullptr;
+
 uint8_t g_my_log_current_level = MY_LOG_LEVEL_VERBOSE; 
 
-
-void check_critical_error(esp_err_t err, const char* msg) {
-    if (err != ESP_OK) {
-        Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
-
-        sd.end(); 
-        while(true); 
-        Serial.println("Reiniciando sistema en 5 segundos...");
-        delay(5000); 
-        ESP.restart(); 
-    }
-}
-
 void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(115200); 
 
-    Serial.begin(115200);
-    while(!Serial);
+   bool useTCP = true; 
 
-    my_log_level_set(MY_LOG_LEVEL_VERBOSE); // imponemos un nivel de log de error 
-    esp_err_t err;
+  if(useTCP) {
+    byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
+    IPAddress local_ip(192, 168, 0, 10);
+    IPAddress server_ip;
 
-    err = sd.begin();
-    check_critical_error(err, "Fallo en Hardware SD");
+    if(server_ip.fromString("192.168.0.100")) {
+        ModbusTCPManager* tcp = new ModbusTCPManager(server_ip, SLAVE_ADDRESS, MODBUS_PORT);
+        tcp->begin(mac, local_ip);
+        modbus = tcp;
+    } else {
+        //check_critical_error(ESP_ERR_CONFIG_INVALID_DATA, "IP del Servidor inválida");
+    }
+  } else {
+    //ModbusRTUManager* rtu = new ModbusRTUManager(19200, 1, SERIAL_8E1);
+    //rtu->begin();
+    //modbus = rtu;
+  }
 
-    err = bFileManager.begin(); 
-    check_critical_error(err, "Fallo en Hardware SD");
+  energy_meter.begin(modbus);
 
-    err = bFileManager.setLastEnvironment(false); 
 
-    Serial.print("Este es el path: ");
-    Serial.println(bFileManager.getCurrentLogPath()); 
-
-    char* a = "prueba"; 
-    bFileManager.newFileLog(a); 
-
-     Serial.print("Este es el path que deberia ser el 1: ");
-    Serial.println(bFileManager.getCurrentLogPath());
-
-     
-    bFileManager.newFileLog(a); 
-    Serial.print("Este es el path que deberia ser el 2: ");
-    Serial.println(bFileManager.getCurrentLogPath());
-
-    bFileManager.newFileLog(a); 
-    Serial.print("Este es el path que deberia ser el 3: ");
-    Serial.println(bFileManager.getCurrentLogPath()); 
-
-    bFileManager.newFileLog(a); 
-    Serial.print("Este es el path que deberia ser el 4: ");
-    Serial.println(bFileManager.getCurrentLogPath());
-
-    bFileManager.newFileLog(a); 
-    Serial.print("Este es el path que deberia ser el 5: ");
-    Serial.println(bFileManager.getCurrentLogPath());
-
-    bFileManager.newFileLog(a); 
-    Serial.print("Este es el path que deberia ser el 6: ");
-    Serial.println(bFileManager.getCurrentLogPath()); 
-
-    Serial.println("final"); 
+  Serial.println("aqio esta la segunda prueba"); 
+  //int result = myFunction(2, 3);
 }
 
-void loop(){
-
+void loop() {
+  // put your main code here, to run repeatedly:
   delay(100); 
-
 }
 
 */
+

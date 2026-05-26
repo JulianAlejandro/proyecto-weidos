@@ -4,8 +4,8 @@
 #include <esp_err.h> 
 #include <esp_log.h>
 #include <ArduinoModbus.h>
-#include "../EnergyMeterRegInterpreter.h"
-#include "../core/ModbusTransport.h"
+//#include "../EnergyMeterRegInterpreter.h"
+#include "../core/IModbusTransport.h"
 #include "../global_types.h"
 
 // Definición de errores específicos (opcional pero profesional)
@@ -25,7 +25,7 @@ struct rawDataBuffer {
 class EnergyMeter750 {
   private:
     static constexpr const char* TAG = "EM750"; // Etiqueta para logs
-    ModbusTransport* _modbus = nullptr;
+    IModbusTransport* _modbus = nullptr;
     bool _initialized = false;
     uint16_t _internalBuffer[MAX_MODBUS_REGS_REQUEST];
     uint16_t _lastReadSize = 0;
@@ -34,7 +34,7 @@ class EnergyMeter750 {
     EnergyMeter750();
     
     // Cambiamos int/bool por esp_err_t
-    esp_err_t begin(ModbusTransport* modbus);
+    esp_err_t begin(IModbusTransport* modbus);
     esp_err_t executeRequest(EM_request req);
     
     // Para lectura simple, a veces es mejor pasar un puntero para el resultado

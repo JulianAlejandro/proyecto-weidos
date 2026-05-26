@@ -1,4 +1,4 @@
-#include "DataloggerFileManager.h"
+#include "TimeLogFileManager.h"
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
@@ -9,7 +9,7 @@
 
 static const char* TAG = "DATA_MGR";
 
-DataloggerFileManager::DataloggerFileManager(SDManager* sdManager, uint16_t maxFiles) 
+TimeLogFileManager::TimeLogFileManager(SDManager* sdManager, uint16_t maxFiles) 
     : _sd(sdManager), _fileCount(0), _intLastYearLog(0), _intLastTimestampLog(0) {
     setMaxFiles(maxFiles);
     memset(_filenames, 0, sizeof(_filenames));
@@ -17,7 +17,7 @@ DataloggerFileManager::DataloggerFileManager(SDManager* sdManager, uint16_t maxF
     _baseYearPath[0] = '\0';
 }
 
-void DataloggerFileManager::setMaxFiles(uint16_t maxFiles) {
+void TimeLogFileManager::setMaxFiles(uint16_t maxFiles) {
     if (maxFiles > MAX_LOG_CAPACITY) {
         _userMaxFiles = MAX_LOG_CAPACITY;
     } else if (maxFiles == 0) {
@@ -27,7 +27,7 @@ void DataloggerFileManager::setMaxFiles(uint16_t maxFiles) {
     }
 }
 
-esp_err_t DataloggerFileManager::begin() {
+esp_err_t TimeLogFileManager::begin() {
     if (!_sd || !_sd->isReady()) {
         MY_LOGE(TAG, "begin: SD Manager no está listo o es nulo.");
         return ESP_ERR_SD_NOT_INIT; 
@@ -52,7 +52,7 @@ esp_err_t DataloggerFileManager::begin() {
 
 
 
-void DataloggerFileManager::buscarAnioMasRecienteCallback(const char* fileName, bool isDir, void* context) {
+void TimeLogFileManager::buscarAnioMasRecienteCallback(const char* fileName, bool isDir, void* context) {
     if (!isDir || !fileName || !context) return; 
 
     int* maxYear = (int*)context;
@@ -65,7 +65,7 @@ void DataloggerFileManager::buscarAnioMasRecienteCallback(const char* fileName, 
     }
 }
 
-esp_err_t DataloggerFileManager::setLastSesion() {
+esp_err_t TimeLogFileManager::setLastSesion() {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
 
     int maxYearFound = 0;
@@ -94,7 +94,7 @@ esp_err_t DataloggerFileManager::setLastSesion() {
 }
 
 
-void DataloggerFileManager::getSesionFilenamesCallback(const char* fileName, bool isDir, void* context) {
+void TimeLogFileManager::getSesionFilenamesCallback(const char* fileName, bool isDir, void* context) {
     if (isDir || !fileName || !context) return; 
 
     std::vector<std::string>* fileList = (std::vector<std::string>*)context;
@@ -116,7 +116,7 @@ void DataloggerFileManager::getSesionFilenamesCallback(const char* fileName, boo
 }
 
 
-esp_err_t DataloggerFileManager::setFilesLastSesion() {
+esp_err_t TimeLogFileManager::setFilesLastSesion() {
     if (!_initialized || strlen(_baseYearPath) == 0) return ESP_ERR_DL_NOT_INIT;
 
     _fileCount = 0;
@@ -153,15 +153,15 @@ esp_err_t DataloggerFileManager::setFilesLastSesion() {
 
 // Estructura auxiliar para pasar datos al callback de borrado de forma segura
 struct DeleteContext {
-    DataloggerFileManager* instance;
+    TimeLogFileManager* instance;
     uint32_t deletedCount;
 };
 
-void DataloggerFileManager::deleteInvalidFilesCallback(const char* fileName, bool isDir, void* context) {
+void TimeLogFileManager::deleteInvalidFilesCallback(const char* fileName, bool isDir, void* context) {
     if (isDir || !fileName || !context) return;
 
     DeleteContext* ctx = (DeleteContext*)context;
-    DataloggerFileManager* self = ctx->instance;
+    TimeLogFileManager* self = ctx->instance;
 
     char fullPath[FILE_NAME_SIZE];
     if (fileName[0] == '/') {
@@ -189,7 +189,7 @@ void DataloggerFileManager::deleteInvalidFilesCallback(const char* fileName, boo
     }
 }
 
-esp_err_t DataloggerFileManager::deleteInvalidFiles() {
+esp_err_t TimeLogFileManager::deleteInvalidFiles() {
     if (!_initialized || strlen(_baseYearPath) == 0) return ESP_ERR_DL_NOT_INIT;
 
     MY_LOGI(TAG, "Iniciando purga de archivos no indexados en: %s", _baseYearPath);
@@ -209,7 +209,7 @@ esp_err_t DataloggerFileManager::deleteInvalidFiles() {
  * @brief Extrae el año y el timestamp numérico del archivo de log actual activo.
  * Si el archivo está vacío, inicializa los valores en 0.
  */
-void DataloggerFileManager::setLastLogTime() {
+void TimeLogFileManager::setLastLogTime() {
     if (_currentLogFile[0] == '\0') {
         _intLastYearLog = 0;
         _intLastTimestampLog = 0;
@@ -241,7 +241,7 @@ void DataloggerFileManager::setLastLogTime() {
     MY_LOGI(TAG, "Último histórico detectado en SD -> Año: %u | Timestamp: %u", _intLastYearLog, _intLastTimestampLog);
 }
 
-esp_err_t DataloggerFileManager::setLastEnvironment(bool delete_rest) {
+esp_err_t TimeLogFileManager::setLastEnvironment(bool delete_rest) {
     esp_err_t err = setLastSesion();
     if (err != ESP_OK) return err;
     
@@ -303,7 +303,7 @@ bool getDataTimestamp(const char* timestamp, uint16_t* outYear, uint32_t* outSes
  * @param year Entero con el año de 4 dígitos (ej: 2027).
  * @return ESP_OK si se creó con éxito, o el código de error correspondiente.
  */
-esp_err_t DataloggerFileManager::newYearFile(uint16_t year) {
+esp_err_t TimeLogFileManager::newYearFile(uint16_t year) {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
     if (year < 2026 || year > 2100) { 
         MY_LOGE(TAG, "newYearFile: Año fuera de rango (%u)", year);
@@ -323,7 +323,7 @@ esp_err_t DataloggerFileManager::newYearFile(uint16_t year) {
     return ESP_OK;
 }
 
-esp_err_t DataloggerFileManager::newFileLog(const char* timestamp) {
+esp_err_t TimeLogFileManager::newFileLog(const char* timestamp) {
     if (!_initialized || strlen(_baseYearPath) == 0) return ESP_ERR_DL_NOT_INIT;
     if (!timestamp || strlen(timestamp) == 0) return ESP_ERR_INVALID_ARG;
 
@@ -400,7 +400,7 @@ esp_err_t DataloggerFileManager::newFileLog(const char* timestamp) {
  * @brief Asegura la existencia del archivo de errores. Si no existe, lo crea vacío.
  * @return ESP_OK si ya existe o se creó con éxito. ESP_FAIL si hay fallos.
  */
-esp_err_t DataloggerFileManager::setErrorLog() {
+esp_err_t TimeLogFileManager::setErrorLog() {
     if (_sd->exists(PATH_ERR_LOG)) {
         return ESP_OK;
     }
@@ -429,7 +429,7 @@ void writeErrorCallback(Stream& stream, void* context) {
  * @param err_message Descripción del error.
  * @return ESP_OK si la escritura fue exitosa.
  */
-esp_err_t DataloggerFileManager::appendErrorLog(const char* timestamp, const char* err_message) {
+esp_err_t TimeLogFileManager::appendErrorLog(const char* timestamp, const char* err_message) {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
     if (!timestamp || !err_message) return ESP_ERR_INVALID_ARG;
 
@@ -450,10 +450,10 @@ esp_err_t DataloggerFileManager::appendErrorLog(const char* timestamp, const cha
     return ESP_OK;
 }
 
-char* DataloggerFileManager::getCurrentLogPath() {
+char* TimeLogFileManager::getCurrentLogPath() {
     return _currentLogFile; 
 }
 
-bool DataloggerFileManager::requiresTimestamp() { 
+bool TimeLogFileManager::requiresTimestamp() { 
     return true; 
 }

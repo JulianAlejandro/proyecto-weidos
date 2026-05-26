@@ -1,5 +1,5 @@
-#ifndef MODBUS_TRANSPORT_H
-#define MODBUS_TRANSPORT_H
+#ifndef IMODBUS_TRANSPORT_H
+#define IMODBUS_TRANSPORT_H
 
 #include <Arduino.h>
 #include <esp_err.h>
@@ -17,12 +17,12 @@
  * By using this interface, the EnergyMeter drivers remain decoupled from the 
  * specific hardware implementation (Ethernet or RS485).
  */
-class ModbusTransport {
+class IModbusTransport {
 public:
     /**
      * @brief Virtual destructor to ensure proper cleanup of derived classes.
      */
-    virtual ~ModbusTransport() {}
+    virtual ~IModbusTransport() {}
 
     // --- Control Methods ---
     

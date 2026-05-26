@@ -12,7 +12,7 @@
 
 #define DEFAULT_YEAR 2026
 
-class DataloggerFileManager : public ILogFileManager {
+class TimeLogFileManager : public ILogFileManager {
 
 private:
   SDManager* _sd; 
@@ -40,7 +40,7 @@ private:
   void setLastLogTime();
 
 public:
-  DataloggerFileManager(SDManager* sdManager, uint16_t maxFiles);
+  TimeLogFileManager(SDManager* sdManager, uint16_t maxFiles);
 
   void setMaxFiles(uint16_t maxFiles) override;
   esp_err_t begin() override;

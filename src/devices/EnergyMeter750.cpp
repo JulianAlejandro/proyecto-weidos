@@ -3,7 +3,7 @@
 
 EnergyMeter750::EnergyMeter750() {}
 
-esp_err_t EnergyMeter750::begin(ModbusTransport* modbus) {
+esp_err_t EnergyMeter750::begin(IModbusTransport* modbus) {
     if (modbus == nullptr) {
         MY_LOGE(TAG, "Fallo al iniciar: Puntero Modbus nulo");
         return ESP_ERR_INVALID_ARG;

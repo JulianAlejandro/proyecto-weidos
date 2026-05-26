@@ -3,7 +3,7 @@
 
 #include <ArduinoRS485.h>
 #include <ArduinoModbus.h>
-#include "../core/ModbusTransport.h"
+#include "../core/IModbusTransport.h"
 
 /**
  * @class ModbusRTUManager
@@ -11,7 +11,7 @@
  * * This class manages RS485 flow control pins, serial configuration, and Modbus RTU 
  * standard transactions. Designed specifically for ESP32/Weidos hardware architectures.
  */
-class ModbusRTUManager : public ModbusTransport {
+class ModbusRTUManager : public IModbusTransport {
   private:
     uint32_t _baudrate;      ///< Serial communication speed (e.g., 9600, 19200)
     uint32_t _config;        ///< Serial frame configuration (e.g., SERIAL_8E1)
