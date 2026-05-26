@@ -1,7 +1,7 @@
 #include "EnergyMeterRegInterpreter.h"
 #include <Arduino.h>
-#include "devices/EnergyMeter750.h"
-#include "services/Datalogger.h"
+#include "EnergyMeter750.h"
+#include "Datalogger.h"
 #include <RTClib.h>
 
 

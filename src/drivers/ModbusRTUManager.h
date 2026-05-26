@@ -3,7 +3,7 @@
 
 #include <ArduinoRS485.h>
 #include <ArduinoModbus.h>
-#include "../core/IModbusTransport.h"
+#include "IModbusTransport.h"
 
 /**
  * @class ModbusRTUManager

@@ -1,65 +1,20 @@
-
-/*
-#include <Arduino.h>
-
-// Definimos una etiqueta (TAG) para identificar de qué parte del código viene el mensaje.
-// Es una buena práctica usar una etiqueta por cada archivo .cpp
-static const char* TAG = "MAIN_APP";
-
-void setup() {
-    // Inicializamos el puerto serie a la misma velocidad del platformio.ini
-    Serial.begin(115200);
-    delay(2000); // Un pequeño delay para que te dé tiempo de abrir el monitor serie
-
-    Serial.println("--- Empezando prueba de ESP_LOG ---");
-
-    // 1. ESP_LOGE - Error (Rojo): Algo crítico falló.
-    ESP_LOGE(TAG, "Esto es un ERROR crítico (Ej: No se pudo conectar al Wi-Fi)");
-
-    // 2. ESP_LOGW - Warning/Advertencia (Amarillo): Algo no va perfecto, pero el programa sigue.
-    ESP_LOGW(TAG, "Esto es una ADVERTENCIA (Ej: Voltaje de batería bajo: %.2fV)", 3.42);
-
-    // 3. ESP_LOGI - Info (Verde): Mensajes generales de éxito o estado.
-    ESP_LOGI(TAG, "Esto es un mensaje de INFORMACION (Ej: Conectado a la IP: %s)", "192.168.1.50");
-
-    // 4. ESP_LOGD - Debug (Blanco/Normal): Datos técnicos para ti mientras desarrollas.
-    int variables_leidas = 4;
-    ESP_LOGD(TAG, "Esto es un mensaje de DEBUG (Ej: Se leyeron %d registros del CSV)", variables_leidas);
-
-    // 5. ESP_LOGV - Verbose (Gris/Normal): Logs extremadamente detallados (volcado de datos brutos).
-    ESP_LOGV(TAG, "Esto es un mensaje VERBOSE (Detalle al milímetro de lo que pasa por dentro)");
-}
-
-void loop() {
-    // Un log repetitivo cada 5 segundos para ver que sigue vivo
-    static uint32_t contador = 0;
-    
-    ESP_LOGI(TAG, "Vuelta del bucle número: %Ld", contador);
-    contador++;
-    
-    delay(5000);
-}
-*/
-
-
 #include <RTClib.h>
 
 // Transport Layer implementations
-#include "transport/ModbusTCPManager.h" 
-#include "transport/ModbusRTUManager.h"
+#include "ModbusTCPManager.h" 
+#include "ModbusRTUManager.h"
 
 // Core Services
 //#include "services/BasicLogFileManager.h"
-#include "services/TimeLogFileManager.h"
-#include "services/Datalogger.h"
-#include "devices/EnergyMeter750.h"
-#include "services/SDManager.h"
+#include "TimeLogFileManager.h"
+#include "Datalogger.h"
+#include "EnergyMeter750.h"
+#include "SDManager.h"
 
 // Logic and Configuration Managers
 #include "EnergyMeterRegInterpreter.h"
 #include "ModbusRequestCSV.h"
 
-//#include "Debug.h"
 
 // Default Modbus Settings
 #define SLAVE_ADDRESS 1 
@@ -78,7 +33,6 @@ EnergyMeter750 energy_meter;
 ModbusRequestCSV mb_csv(&sd);
 IModbusTransport* modbus = nullptr; // Polymorphic pointer for TCP or RTU
 
-//uint8_t g_my_log_current_level = MY_LOG_LEVEL_VERBOSE; 
 
 
 void check_critical_error(esp_err_t err, const char* msg) {
@@ -124,15 +78,13 @@ void setup() {
     Serial.begin(115200);
     while(!Serial); 
     
-    //my_log_level_set(MY_LOG_LEVEL_VERBOSE); // imponemos un nivel de log de error 
-
    
     if (!rtc.begin()) {
         Serial.println("En esta aplicacion el RTC es vital..."); 
         while(true);
     }
 
-    rtc.adjust(DateTime(2026, 5, 26, 12, 52, 1));
+    rtc.adjust(DateTime(2026, 5, 26, 13, 29, 1));
 
     esp_err_t err;
 

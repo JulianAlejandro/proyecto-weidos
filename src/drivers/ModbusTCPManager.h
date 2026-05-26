@@ -3,7 +3,7 @@
 
 #include <Ethernet.h>
 #include <ArduinoModbus.h>
-#include "../core/IModbusTransport.h" 
+#include "IModbusTransport.h" 
 
 #define ESP_ERR_MODBUS_TCP_IP_NOT_FOUND (ESP_ERR_MODBUS_BASE + 101)
 #define ESP_ERR_MODBUS_TCP_SOCKET       (ESP_ERR_MODBUS_BASE + 102)
