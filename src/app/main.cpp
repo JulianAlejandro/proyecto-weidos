@@ -2,7 +2,7 @@
 
 // Transport Layer implementations
 #include "ModbusTCPManager.h" 
-#include "ModbusRTUManager.h"
+//#include "ModbusRTUManager.h"
 
 // Core Services
 //#include "BasicLogFileManager.h"
@@ -14,6 +14,8 @@
 // Logic and Configuration Managers
 #include "EnergyMeterRegInterpreter.h"
 #include "ModbusRequestCSV.h"
+
+#include "LogMsgGlobal.h"
 
 // Default Modbus Settings
 #define SLAVE_ADDRESS 1 
@@ -37,6 +39,7 @@ void check_critical_error(esp_err_t err, const char* msg) {
     if (err != ESP_OK) {
         Serial.printf("\n[CRITICO] %s | Error: 0x%X\n", msg, err);
 
+        /*
         if (sd.isReady()) {
             // Aumentamos a 32 por seguridad para evitar truncamientos en el stack
             char timestamp[128]; 
@@ -61,7 +64,8 @@ void check_critical_error(esp_err_t err, const char* msg) {
         } else {
             Serial.println("[AVISO] SD no lista. Imposible guardar el reporte.");
         }
-
+        */
+         Serial.println("BLOQUEAMOS EL MICRO");
         sd.end(); 
         while(true); 
         Serial.println("Reiniciando sistema en 5 segundos...");
@@ -70,6 +74,22 @@ void check_critical_error(esp_err_t err, const char* msg) {
     }
 }
 
+void onEnergyMeterError(const char* tag, const char* mensaje) {
+    // 1. Mostrar el error en el monitor serial
+    Serial.printf("[ERROR CONTROLADO] [%s] -> %s\n", tag, mensaje);
+
+    // 2. Si la SD está lista, obtener la estampa de tiempo y guardar en el log de errores
+    if (sd.isReady()) {
+        char timestamp[64];
+        DateTime now = rtc.now();
+        
+        snprintf(timestamp, sizeof(timestamp), "%04d-%02d-%02d %02d:%02d:%02d", 
+                 now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+
+        // Usamos el objeto global datalogger del main para persistir el error
+        datalogger.appendErrorLog(timestamp, mensaje);
+    }
+}
 
 void setup() {
 
@@ -82,7 +102,7 @@ void setup() {
         while(true);
     }
 
-    rtc.adjust(DateTime(2026, 5, 26, 10, 15, 1));
+    rtc.adjust(DateTime(2026, 5, 26, 15, 58, 1));
 
     esp_err_t err;
 
@@ -111,27 +131,30 @@ void setup() {
 
     bool useTCP = true; 
 
-    if(useTCP) {
-        byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
-        IPAddress local_ip(192, 168, 0, 10);
-        IPAddress server_ip;
+    
+    byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xE9 };
+    IPAddress local_ip(192, 168, 0, 10);
+    IPAddress server_ip;
 
-        if(server_ip.fromString(mb_csv.getIpAdress())) {
-            ModbusTCPManager* tcp = new ModbusTCPManager(server_ip, SLAVE_ADDRESS, MODBUS_PORT);
-            tcp->begin(mac, local_ip);
-            modbus = tcp;
-        } else {
-            check_critical_error(ESP_ERR_CONFIG_INVALID_DATA, "IP del Servidor inválida");
-        }
+    if(server_ip.fromString(mb_csv.getIpAdress())) {
+        ModbusTCPManager* tcp = new ModbusTCPManager(server_ip, SLAVE_ADDRESS, MODBUS_PORT);
+        tcp->begin(mac, local_ip);
+        modbus = tcp;
     } else {
+        check_critical_error(ESP_ERR_CONFIG_INVALID_DATA, "IP del Servidor inválida");
+    }
+     
+    /*else {
         ModbusRTUManager* rtu = new ModbusRTUManager(19200, 1, SERIAL_8E1);
         rtu->begin();
         modbus = rtu;
-    }
+    }*/
 
     // 5. Driver de Dispositivo y Sesión de Log
     err = energy_meter.begin(modbus);
     check_critical_error(err, "Error al vincular Driver EM750");
+
+    Log_msg::registerCallback(onEnergyMeterError); 
 
     err = regInterpreter.prepareAdvanceDatalogger(req, &datalogger, &rtc);
     check_critical_error(err, "No se pudo iniciar la sesión de Datalogging");

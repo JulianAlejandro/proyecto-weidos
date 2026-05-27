@@ -13,11 +13,6 @@ AbstractLogFileManager::AbstractLogFileManager(SDManager* sdManager, uint16_t ma
     //snprintf(_pathErrLog, sizeof(_pathErrLog), "%s/ERROR", dirRoot);
 }
 
-/*
-void AbstractLogFileManager::setMaxFiles(uint16_t maxFiles) {
-    _userMaxFiles = maxFiles;
-}
-*/
 
 void AbstractLogFileManager::setMaxFiles(uint16_t maxFiles) {
     if (maxFiles > MAX_LOG_CAPACITY) {

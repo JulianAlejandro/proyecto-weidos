@@ -4,9 +4,9 @@
 #include <esp_err.h> 
 #include <esp_log.h>
 #include <ArduinoModbus.h>
-//#include "../EnergyMeterRegInterpreter.h"
 #include "IModbusTransport.h"
 #include "global_types.h"
+#include "ObservableError.h"
 
 // Definición de errores específicos (opcional pero profesional)
 #define ESP_ERR_EM750_BASE           0x20000
@@ -32,7 +32,7 @@ class EnergyMeter750 {
 
   public:
     EnergyMeter750();
-    
+   
     // Cambiamos int/bool por esp_err_t
     esp_err_t begin(IModbusTransport* modbus);
     esp_err_t executeRequest(EM_request req);

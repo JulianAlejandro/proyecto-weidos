@@ -7,7 +7,7 @@
 #define FILE_NAME_SIZE 32 
 
 #define LOG_FILE_EXT   ".csv"
-#define PATH_ERROR_LOG "/ERROR"
+#define PATH_ERROR_LOG "/ERR_LOG.txt"
 
 class AbstractLogFileManager : public ILogFileManager {
 protected:
