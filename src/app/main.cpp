@@ -5,8 +5,8 @@
 #include "ModbusRTUManager.h"
 
 // Core Services
-#include "BasicLogFileManager.h"
-//#include "TimeLogFileManager.h"
+//#include "BasicLogFileManager.h"
+#include "TimeLogFileManager.h"
 #include "Datalogger.h"
 #include "EnergyMeter750.h"
 #include "SDManager.h"
@@ -24,14 +24,13 @@ RTC_DS3231 rtc;
 SDManager sd; 
 
 //BasicLogFileManager fileManager(&sd, 4);
-BasicLogFileManager fileManager(&sd, 4);
+TimeLogFileManager fileManager(&sd, 4);
 Datalogger datalogger(&sd, &fileManager);
 
 EnergyMeterRegInterpreter regInterpreter(&sd); 
 EnergyMeter750 energy_meter; 
 ModbusRequestCSV mb_csv(&sd);
 IModbusTransport* modbus = nullptr; // Polymorphic pointer for TCP or RTU
-
 
 
 void check_critical_error(esp_err_t err, const char* msg) {
@@ -83,7 +82,7 @@ void setup() {
         while(true);
     }
 
-    rtc.adjust(DateTime(2026, 5, 26, 18, 02, 1));
+    rtc.adjust(DateTime(2026, 5, 26, 10, 15, 1));
 
     esp_err_t err;
 

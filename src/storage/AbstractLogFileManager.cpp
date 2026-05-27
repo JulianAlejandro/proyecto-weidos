@@ -10,11 +10,23 @@ AbstractLogFileManager::AbstractLogFileManager(SDManager* sdManager, uint16_t ma
     
     // Almacenamos dinámicamente las rutas que nos pasa la clase hija
     snprintf(_dirLogName, sizeof(_dirLogName), "%s", dirRoot);
-    snprintf(_pathErrLog, sizeof(_pathErrLog), "%s/ERROR", dirRoot);
+    //snprintf(_pathErrLog, sizeof(_pathErrLog), "%s/ERROR", dirRoot);
 }
 
+/*
 void AbstractLogFileManager::setMaxFiles(uint16_t maxFiles) {
     _userMaxFiles = maxFiles;
+}
+*/
+
+void AbstractLogFileManager::setMaxFiles(uint16_t maxFiles) {
+    if (maxFiles > MAX_LOG_CAPACITY) {
+        _userMaxFiles = MAX_LOG_CAPACITY;
+    } else if (maxFiles == 0) {
+        _userMaxFiles = 1; 
+    } else {
+        _userMaxFiles = maxFiles;
+    }
 }
 
 esp_err_t AbstractLogFileManager::begin() {
@@ -41,12 +53,12 @@ esp_err_t AbstractLogFileManager::begin() {
 }
 
 esp_err_t AbstractLogFileManager::setErrorLog() {
-    if (_sd->exists(_pathErrLog)) {
+    if (_sd->exists(PATH_ERROR_LOG)) {
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Creando archivo de logs de errores en: %s", _pathErrLog);
-    esp_err_t err = _sd->createFile(_pathErrLog);
+    ESP_LOGI(TAG, "Creando archivo de logs de errores en: %s", PATH_ERROR_LOG);
+    esp_err_t err = _sd->createFile(PATH_ERROR_LOG);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "No se pudo inicializar la ruta de errores. Err: 0x%X", err);
         return err;
@@ -73,7 +85,7 @@ esp_err_t AbstractLogFileManager::appendErrorLog(const char* timestamp, const ch
     char tempLine[512];
     snprintf(tempLine, sizeof(tempLine), "%s;%s\n", timestamp, err_message);
 
-    bool success = !_sd->withFileWrite(_pathErrLog, writeErrorCallback, tempLine);
+    bool success = !_sd->withFileWrite(PATH_ERROR_LOG, writeErrorCallback, tempLine);
     if (!success) {
         ESP_LOGE(TAG, "Fallo al escribir en el archivo de errores.");
         return ESP_ERR_SD_WRITE_FAIL; 

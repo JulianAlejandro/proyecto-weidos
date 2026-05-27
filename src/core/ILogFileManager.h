@@ -17,11 +17,15 @@ public:
     virtual ~ILogFileManager() = default; // Destructor virtual obligatorio
 
     virtual esp_err_t begin() = 0;
-    virtual esp_err_t setLastEnvironment(bool delete_rest) = 0;
-    virtual char* getCurrentLogPath() = 0;
-    virtual esp_err_t newFileLog(const char* timestamp = nullptr) = 0; 
     virtual void setMaxFiles(uint16_t maxFiles) = 0;
+
+    virtual esp_err_t setLastEnvironment(bool delete_rest) = 0;
+    virtual esp_err_t newFileLog(const char* timestamp = nullptr) = 0;
+
+    virtual char* getCurrentLogPath() = 0;
+
     virtual esp_err_t appendErrorLog(const char* timestamp, const char* err_message) = 0;
+
     virtual bool requiresTimestamp() = 0;
 };
 
