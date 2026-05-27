@@ -1,4 +1,5 @@
 #include "ModbusTCPManager.h"
+#include "LogMsgGlobal.h"
 
 static const char* TAG = "MB_TCP_MGR";
 
@@ -24,6 +25,7 @@ esp_err_t ModbusTCPManager::ensureConnection() {
     
     if (!_modbusClient.begin(_serverIP, _port)) {
         ESP_LOGE(TAG, "Error de transporte: No se pudo abrir el socket TCP");
+        Log_msg::println(TAG, "Error de transporte: No se pudo abrir el socket TCP");
         return ESP_ERR_MODBUS_TCP_SOCKET; 
     }
     
@@ -43,6 +45,7 @@ esp_err_t ModbusTCPManager::begin(byte mac[], IPAddress localIP) {
     // Verificación de hardware físico
     if (Ethernet.hardwareStatus() == EthernetNoHardware) {
         ESP_LOGE(TAG, "Hardware Ethernet no detectado");
+        Log_msg::println(TAG, "Hardware Ethernet no detectado");
         return ESP_ERR_NOT_FOUND;
     }
     
@@ -67,6 +70,7 @@ esp_err_t ModbusTCPManager::readHoldingRegisters(uint16_t address, uint16_t quan
 
     if (!_modbusClient.requestFrom(_slaveID, HOLDING_REGISTERS, address, quantity)) {
         ESP_LOGE(TAG, "Fallo en lectura Regs @ 0x%04X. Cerrando socket.", address);
+        Log_msg::println(TAG, "Fallo en lectura Regs @ 0x%04X. Cerrando socket.", address);
         _modbusClient.stop(); // Forzamos cierre para limpiar el buffer en caso de error
         return ESP_ERR_MODBUS_TIMEOUT;
     }

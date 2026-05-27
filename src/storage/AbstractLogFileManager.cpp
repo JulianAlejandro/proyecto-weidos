@@ -80,6 +80,7 @@ esp_err_t AbstractLogFileManager::appendErrorLog(const char* timestamp, const ch
     char tempLine[512];
     snprintf(tempLine, sizeof(tempLine), "%s;%s\n", timestamp, err_message);
 
+
     bool success = !_sd->withFileWrite(PATH_ERROR_LOG, writeErrorCallback, tempLine);
     if (!success) {
         ESP_LOGE(TAG, "Fallo al escribir en el archivo de errores.");

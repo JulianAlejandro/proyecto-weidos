@@ -66,6 +66,7 @@ void check_critical_error(esp_err_t err, const char* msg) {
         }
         */
          Serial.println("BLOQUEAMOS EL MICRO");
+        delay(1000);
         sd.end(); 
         while(true); 
         Serial.println("Reiniciando sistema en 5 segundos...");
@@ -75,10 +76,10 @@ void check_critical_error(esp_err_t err, const char* msg) {
 }
 
 void onEnergyMeterError(const char* tag, const char* mensaje) {
-    // 1. Mostrar el error en el monitor serial
+    // 1. Mostrar el error en el monitor serial (se queda igual)
     Serial.printf("[ERROR CONTROLADO] [%s] -> %s\n", tag, mensaje);
 
-    // 2. Si la SD está lista, obtener la estampa de tiempo y guardar en el log de errores
+    // 2. Si la SD está lista, guardar la información completa
     if (sd.isReady()) {
         char timestamp[64];
         DateTime now = rtc.now();
@@ -86,8 +87,14 @@ void onEnergyMeterError(const char* tag, const char* mensaje) {
         snprintf(timestamp, sizeof(timestamp), "%04d-%02d-%02d %02d:%02d:%02d", 
                  now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
-        // Usamos el objeto global datalogger del main para persistir el error
-        datalogger.appendErrorLog(timestamp, mensaje);
+        // 🛠️ SOLUCIÓN: Creamos un nuevo buffer para empaquetar "[TAG] Mensaje"
+        char mensajeCompleto[192]; // 64 (para el TAG) + 128 (del mensaje original) = 192 bytes seguro
+        
+        // Formateamos el mensaje incluyendo el TAG de forma idéntica a como lo ves en consola
+        snprintf(mensajeCompleto, sizeof(mensajeCompleto), "[%s] %s", tag, mensaje);
+
+        // Pasamos el nuevo mensaje empaquetado al datalogger
+        datalogger.appendErrorLog(timestamp, mensajeCompleto);
     }
 }
 
@@ -102,7 +109,7 @@ void setup() {
         while(true);
     }
 
-    rtc.adjust(DateTime(2026, 5, 26, 15, 58, 1));
+    rtc.adjust(DateTime(2026, 5, 26, 17, 11, 1));
 
     esp_err_t err;
 
