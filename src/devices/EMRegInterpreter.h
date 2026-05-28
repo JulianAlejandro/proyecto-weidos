@@ -1,11 +1,10 @@
-#ifndef ENERGY_METER_INTERPRETER_H
-#define ENERGY_METER_INTERPRETER_H
+#ifndef EM_REG_INTERPRETER_H
+#define EM_REG_INTERPRETER_H
 
 #include "SDManager.h"
-#include <CSV_Parser.h>
 #include "global_types.h"
+#include <CSV_Parser.h>
 
-// codigos
 #define ESP_ERR_INTERPRETER_BASE      0x60000
 #define ESP_ERR_INTERPRETER_NOT_INIT  (ESP_ERR_INTERPRETER_BASE + 1)
 #define ESP_ERR_INTERPRETER_MAP_MISS  (ESP_ERR_INTERPRETER_BASE + 2) // No hay registros en ese rango
@@ -86,70 +85,45 @@ struct netDataString {
     uint16_t size; 
 };
 
-/**
- * @struct Parameters
- * @brief High-level datalogger configuration parameters extracted from CSV.
- */
-struct Parameters {
-    const char* log_interval;
-    const char* new_file;
-    const char* max_files; 
-};
-
-// Forward declarations
-class EnergyMeter750;
-class Datalogger; 
-class RTC_DS3231; 
 
 /**
  * @class EnergyMeterRegInterpreter
  * @brief Manages the parsing of CSV register maps and the conversion of raw Modbus data.
  */
-class EnergyMeterRegInterpreter {
+class EMRegInterpreter {
 
 private:
     SDManager* _sd = nullptr; 
     EM_request _current_request; 
     bool _initialized = false; 
-
-    int ultimaUnidadTiempo;
-   
-    unsigned long anteriorMillisModbus = 0; 
-    //unsigned long anteriorMillisArchivo = 0; 
-    nameColValues _misTitulos;
-
-    int _int_log_interval;
-    uint32_t _new_file_interval_s; 
-    int _int_max_files; 
-
-    bool _advancedIsInitialized = false; 
-    
+ 
     RegisterEntry _registryBuffer[MAX_MODBUS_REGS]; 
     uint16_t _registrySize; 
 
     rawDataReg _RawDataBuffer[MAX_MODBUS_REGS]; 
     char _netDataStringBuffer[MAX_MODBUS_REGS][MAX_TEXT_SIZE];
   
-    char _log_interval[MAX_TEXT_SIZE]; 
-    char _new_file[MAX_TEXT_SIZE]; 
-    char _max_files[MAX_TEXT_SIZE];
+    //char _log_interval[MAX_TEXT_SIZE]; 
+    //char _new_file[MAX_TEXT_SIZE]; 
+    //char _max_files[MAX_TEXT_SIZE];
 
     //bool _creadaUnaSesion = false;
    
     int getFormatSize(coded_format f); 
     static void getNetDataString(char* dest, rawDataReg rawRegister);
-    esp_err_t lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
+    //esp_err_t lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
     void processParserData(CSV_Parser& cp, uint16_t start, uint16_t size);
 
 public:
-    EnergyMeterRegInterpreter(SDManager* sdManager);
+    EMRegInterpreter(SDManager* sdManager);
     esp_err_t begin();
 
     /**
      * @brief Reads the SD map and filters registers based on a requested range.
      * @return An EM_request object with the calculated total size.
      */
-    esp_err_t startNewRequest(const uint16_t start_addr, const uint16_t size, EM_request *out_request);
+    //esp_err_t startNewRequest(const uint16_t start_addr, const uint16_t size, EM_request *out_request);
+    esp_err_t startNewRequest(const uint16_t start_addr, const uint16_t size);
 
     /**
      * @brief Maps raw 16-bit arrays into the formatted rawDataReg buffer.
@@ -160,6 +134,8 @@ public:
      * @brief Gets titles for columns where 'Log' is enabled.
      */
     nameColValues getLastNameValues();
+
+    EM_request getLastEMRequest(); 
 
     /**
      * @brief Returns a buffer of formatted strings (e.g., "12.34") for the logger.
@@ -174,15 +150,17 @@ public:
     /**
      * @brief Loads global configuration (interval, max files) from the first lines of the CSV.
      */
-    void loadParametersMapRegister(); 
+    //void loadParametersMapRegister(); // pensar en si quitar y creo que lo mejor es que si 
 
-    Parameters getParameters();
+    //Parameters getParameters();
 
     /**
      * @brief Automates the entire datalogging setup and execution.
      */
-    esp_err_t prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc);
-    esp_err_t advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
+
 };
 
 #endif
+
+
+

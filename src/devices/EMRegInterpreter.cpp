@@ -1,25 +1,17 @@
-#include "EnergyMeterRegInterpreter.h"
+#include "EMRegInterpreter.h"
 #include <Arduino.h>
-#include "EnergyMeter750.h"
-#include "Datalogger.h"
-#include <RTClib.h>
-
 
 /**
  * @struct StreamContext
  * @brief Helper to pass class context and parameters to static callback functions.
  */
 struct StreamContext {
-    EnergyMeterRegInterpreter* instance;
+    EMRegInterpreter* instance;
     uint16_t start_addr;
     uint16_t size;
 };
 
-// Internal Helper Prototypes
-esp_err_t lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
-esp_err_t crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos); 
-
-EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager) 
+EMRegInterpreter::EMRegInterpreter(SDManager* sdManager)
   : _sd(sdManager) 
 {
     _registrySize = 0;
@@ -28,7 +20,7 @@ EnergyMeterRegInterpreter::EnergyMeterRegInterpreter(SDManager* sdManager)
 /**
  * @brief Checks if the SD manager is ready and initializes the interpreter.
  */
-esp_err_t EnergyMeterRegInterpreter::begin(){
+esp_err_t EMRegInterpreter::begin(){
     if (!_sd->isReady()) return ESP_ERR_SD_NOT_INIT;
     _initialized = true; 
     return ESP_OK;
@@ -37,7 +29,7 @@ esp_err_t EnergyMeterRegInterpreter::begin(){
 /**
  * @brief Processes the parsed CSV data to filter registers within the requested range.
  */
-void EnergyMeterRegInterpreter::processParserData(CSV_Parser& cp, uint16_t start, uint16_t size) {
+void EMRegInterpreter::processParserData(CSV_Parser& cp, uint16_t start, uint16_t size) {
     // 1. Retrieve pointers and verify column headers
     int32_t *addrs = (int32_t*)cp["Address"];
     char **formats = (char**)cp["Format"];
@@ -97,7 +89,8 @@ void EnergyMeterRegInterpreter::processParserData(CSV_Parser& cp, uint16_t start
 /**
  * @brief Initializes a new request by parsing the register map from SD.
  */
-esp_err_t EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size, EM_request *out_req) {
+//esp_err_t EMRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size, EM_request *out_req) {
+esp_err_t EMRegInterpreter::startNewRequest(const uint16_t start_addr, const uint16_t size) {
     if(!_initialized) return ESP_ERR_INTERPRETER_NOT_INIT;
 
     _current_request.start_addr = 0;
@@ -128,7 +121,7 @@ esp_err_t EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, 
     if (_registrySize == 0) return ESP_ERR_INTERPRETER_MAP_MISS;
 
     _current_request.start_addr = _registryBuffer[0].address; 
-    if (out_req) *out_req = _current_request;
+    //if (out_req) *out_req = _current_request;
     
     return ESP_OK;
 }
@@ -136,7 +129,7 @@ esp_err_t EnergyMeterRegInterpreter::startNewRequest(const uint16_t start_addr, 
 /**
  * @brief Distributes a raw 16-bit response array into formatted data structures.
  */
-bufRawDataReg EnergyMeterRegInterpreter::getBufferDataRaw(const uint16_t* data_readed, const uint16_t size) {
+bufRawDataReg EMRegInterpreter::getBufferDataRaw(const uint16_t* data_readed, const uint16_t size) {
     bufRawDataReg res;
     res.buffer = _RawDataBuffer; 
     res.size = 0;
@@ -173,7 +166,7 @@ bufRawDataReg EnergyMeterRegInterpreter::getBufferDataRaw(const uint16_t* data_r
 /**
  * @brief Utility to convert two 16-bit registers into a IEEE 754 float.
  */
-float EnergyMeterRegInterpreter::getFloatConversion(const uint16_t* data){
+float EMRegInterpreter::getFloatConversion(const uint16_t* data){
     if (data == nullptr) return 0.0f;
     float res; 
     // Assumes Big Endian: [0] = High Word, [1] = Low Word
@@ -185,7 +178,7 @@ float EnergyMeterRegInterpreter::getFloatConversion(const uint16_t* data){
 /**
  * @brief Returns list of titles for registers that have logging enabled.
  */
-nameColValues EnergyMeterRegInterpreter::getLastNameValues() {
+nameColValues EMRegInterpreter::getLastNameValues() {
     nameColValues res;
     int count = 0; 
     res.size = 0;
@@ -203,10 +196,14 @@ nameColValues EnergyMeterRegInterpreter::getLastNameValues() {
     return res;
 }
 
+EM_request EMRegInterpreter::getLastEMRequest(){
+    return _current_request; 
+}
+
 /**
  * @brief Returns the number of Modbus registers required for a given format.
  */
-int EnergyMeterRegInterpreter::getFormatSize(coded_format f) {
+int EMRegInterpreter::getFormatSize(coded_format f) {
     switch (f) {
         case FLOAT:   return SIZE_FLOAT; 
         case INT:     return SIZE_INT;
@@ -223,7 +220,7 @@ int EnergyMeterRegInterpreter::getFormatSize(coded_format f) {
 /**
  * @brief String to Enum mapping for CSV formats.
  */
-coded_format EnergyMeterRegInterpreter::stringToFormat(const char* str) {
+coded_format EMRegInterpreter::stringToFormat(const char* str) {
     if (str == nullptr) return FORMAT_UNKNOWN;
 
     if (strcasecmp(str, "FLOAT") == 0)  return FLOAT;
@@ -242,7 +239,7 @@ coded_format EnergyMeterRegInterpreter::stringToFormat(const char* str) {
 /**
  * @brief Formats raw data into strings for the logging buffer.
  */
-netDataString EnergyMeterRegInterpreter::getBufNetDataString() {
+netDataString EMRegInterpreter::getBufNetDataString() {
     netDataString res;
     res.size = 0;
     int count = 0; 
@@ -265,6 +262,7 @@ netDataString EnergyMeterRegInterpreter::getBufNetDataString() {
 /**
  * @brief Reads configuration parameters from the CSV header.
  */
+/*
 void EnergyMeterRegInterpreter::loadParametersMapRegister() {
     CSV_Parser cp("sssss", true, ';');
 
@@ -300,145 +298,21 @@ void EnergyMeterRegInterpreter::loadParametersMapRegister() {
         }
     }
 }
-
+*/
+/*
 Parameters EnergyMeterRegInterpreter::getParameters(){
     Parameters res; 
     res.log_interval = _log_interval;
     res.new_file = _new_file; 
     res.max_files = _max_files; 
     return res; 
-}
-
-/**
- * @brief Validates input requirements and prepares the SD log session.
- */
-esp_err_t EnergyMeterRegInterpreter::prepareAdvanceDatalogger(Struct_MBRequest MB_req, Datalogger* datalogger, RTC_DS3231* rtc) {
-    _advancedIsInitialized = false;
-
-    // Validaciones de negocio
-    if (MB_req.channel <= 0) return ESP_ERR_INVALID_ARG;
-    if (MB_req.length == 0 || MB_req.length > MAX_MODBUS_REGS_REQUEST) return ESP_ERR_INVALID_SIZE;
-    
-    // Intentar cargar mapa
-    esp_err_t err = startNewRequest(MB_req.start_addres, MB_req.length, nullptr);
-    if (err != ESP_OK) return err;
-
-    _misTitulos = getLastNameValues();
-    if(_misTitulos.size == 0) return ESP_ERR_INTERPRETER_MAP_MISS;
-    
-    // Cargar parámetros adicionales
-    loadParametersMapRegister(); 
-    Parameters param = getParameters();
-    
-    _int_log_interval = atoi(param.log_interval);
-    _int_max_files = atoi(param.max_files);
-
-/*
-    Serial.print("log interval: ");
-    Serial.println(param.log_interval);
-
-    Serial.print("max files: ");
-    Serial.println(param.max_files);
-
-    Serial.print("tiempo file"); 
-    Serial.println(param.new_file);
-
-    */
-
-    if (_int_max_files <= 0 || _int_max_files >= MAX_LOG_CAPACITY) {
-        return ESP_ERR_INTERPRETER_BAD_CONF;
-    }
-
-    datalogger->setMaxFiles(_int_max_files);
-    //datalogger->clearAllLogs(); // Optional: clears folder on every reboot
-    
-    _advancedIsInitialized = true;
-
-    //err = crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
- 
-    return err; 
-}
+}*/
 
 
-/**
- * @brief Main execution loop for timed logging and file rotation.
- */
- esp_err_t EnergyMeterRegInterpreter::advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc) {
-    if (!_advancedIsInitialized){ 
-        //Serial.println("error de que no se inicializo el advanced"); 
-        return ESP_ERR_INTERPRETER_NOT_INIT;
-    };
-
-    unsigned long actualMillis = millis();
-    DateTime ahora = rtc->now();
-
-    // --- CAMBIO DE SESIÓN (Basado en RTC) ---
-    bool debeCambiarSesion = false;
-    esp_err_t err; 
-
-    // Comparamos el tiempo actual con la última vez que se cambió de archivo
-    if (ahora.minute() != ultimaUnidadTiempo) { 
-        // Ejemplo para cambio cada MINUTO
-        if (strcasecmp(_new_file, "minute") == 0) debeCambiarSesion = true;
-        
-        // Ejemplo para cambio cada HORA (si el minuto es 0 y cambió la hora)
-        if (strcasecmp(_new_file, "hour") == 0 && ahora.minute() == 0) debeCambiarSesion = true;
-        
-        // Ejemplo para cambio cada DÍA (si es medianoche)
-        if (strcasecmp(_new_file, "day") == 0 && ahora.hour() == 0 && ahora.minute() == 0) debeCambiarSesion = true;
-
-        if (debeCambiarSesion) {
-            ultimaUnidadTiempo = ahora.minute(); // Actualizamos bandera
-            err = crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
-
-            if (err != ESP_OK){
-                //Serial.println("error 2");  
-            return err;
-            }
-        }
-    }
-
-    // --- MUESTREO (Basado en millis) ---
-    if (actualMillis - anteriorMillisModbus >= (unsigned long)_int_log_interval) {
-        anteriorMillisModbus += _int_log_interval;
-        
-        err = lectura_modbus(datalogger, rtc, em, _current_request);
-       
-        if (err != ESP_OK){
-            //Serial.println("error 3");  
-            return err;
-        };
-    }
-    return ESP_OK;
-}
- /*
-void EnergyMeterRegInterpreter::advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc){
-   
-    if (_advancedIsInitialized){
-        unsigned long actualMillis = millis();
-
-        // Timer for file rotation (new log session)
-        if (actualMillis - anteriorMillisArchivo >= (_new_file_interval_s * 1000UL)) { 
-            anteriorMillisArchivo = actualMillis;
-            crear_nueva_sesion_log(datalogger, rtc, &_misTitulos);
-        }  
-        
-        // Timer for Modbus sampling
-        if (actualMillis - anteriorMillisModbus >= (unsigned long)_int_log_interval) {  
-            anteriorMillisModbus = actualMillis;
-            lectura_modbus(datalogger, rtc, em, _current_request);       
-        }      
-        
-    } else {
-        //Serial.println(F("System not initialized. Waiting..."));
-        //delay(5000); 
-    }
-}
-*/
 /**
  * @brief Converts binary raw registers to human-readable strings based on format.
  */
-void EnergyMeterRegInterpreter::getNetDataString(char* dest, rawDataReg rawRegister){
+void EMRegInterpreter::getNetDataString(char* dest, rawDataReg rawRegister){
     coded_format fmt = rawRegister.format;
     uint16_t* d = rawRegister.data;
 
@@ -487,106 +361,4 @@ void EnergyMeterRegInterpreter::getNetDataString(char* dest, rawDataReg rawRegis
         break;
     }
 } 
-
-//--------- Helper Functions ------------------
-
-/**
- * @brief Genera un nombre de archivo basado en el RTC y crea sesión solo si el nombre cambia.
- */
-esp_err_t crear_nueva_sesion_log(Datalogger* datalogger, RTC_DS3231* rtc, nameColValues* misTitulos) {
-    DateTime ahora = rtc->now();
-    char nombreFichero[16]; 
-
-    // Formato: MMDDHHmm
-    snprintf(nombreFichero, sizeof(nombreFichero), "%02d%02d%02d%02d%02d%02d", 
-        ahora.year(), // Extrae los últimos dos dígitos del año (ej: 2026 -> 26)
-        ahora.month(), 
-        ahora.day(), 
-        ahora.hour(),
-        ahora.minute(),
-        ahora.second());
-    
-    //const char* actual = datalogger->getCurrentLogFile();
-
-    // --- DEBUG LOGS ---
-   //Serial.println(F("--- Comparación de Sesión ---"));
-   //Serial.print(F("Nueva sugerencia (nombreFichero): ")); 
-   //Serial.println(nombreFichero);
-   //Serial.print(F("Sesión activa (actual): ")); 
-   //Serial.println(actual[0] == '\0' ? "[VACÍO]" : actual);
-    // ------------------
-
-    // Verificamos si nombreFichero está contenido en la ruta actual
-    /*
-    if (actual[0] != '\0' && strstr(actual, nombreFichero) != nullptr) {
-        //Serial.println(F(">> COINCIDENCIA DETECTADA: Manteniendo sesión actual.")); 
-        return ESP_OK; 
-    }
-*/
-    esp_err_t err; 
-    //Serial.println(F(">> NO COINCIDE: Creando nueva sesión...")); 
-
-    //Serial.print("nueva sesion: "); 
-    //Serial.println(nombreFichero);
-
-    err = datalogger->newCSVLogSesion(nombreFichero, misTitulos->buffer, misTitulos->size);
-    if(err != ESP_OK){
-        return err; 
-    }
-
-/*
-     if(datalogger->newCSVLogSesion(nombreFichero, misTitulos->buffer, misTitulos->size)){
-            Serial.println("nueva session correcta");
-     }else{
-            Serial.println("nueva sesion fracaso");
-     }
-*/
-     return ESP_OK;
-}
-
-/**
- * @brief Internal Modbus task: Executes request, converts data, and writes to SD.
- */
-esp_err_t EnergyMeterRegInterpreter::lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req){
-    
-    // 1. Ejecutar Modbus y capturar error
-    esp_err_t err = em->executeRequest(req);
-    
-    if (err != ESP_OK) {
-        ESP_LOGE("INTERP", "Fallo Modbus: 0x%X", err);
-        return err; // No intentamos procesar datos basura
-    }
-
-    // 2. Procesar datos (esto es interno, confiamos en el buffer)
-    rawDataBuffer raw = em->readDataBuffer();
-    getBufferDataRaw(raw.buffer, raw.size);
-    netDataString res = getBufNetDataString(); 
-
-    // 3. Obtener tiempo
-    DateTime now = rtc->now();
-    char bufferTime[20];
-    snprintf(bufferTime, sizeof(bufferTime), "%04d-%02d-%02d %02d:%02d:%02d", 
-            now.year(), now.month(), now.day(), 
-            now.hour(), now.minute(), now.second());
-
-    // 4. Intentar escribir en SD y capturar error
-    // (Asumiendo que writeRow de Datalogger también se actualiza a esp_err_t)
-
-    err = datalogger->appendNewDataCSVToLog(bufferTime, res.buffer, res.size);
-    if(err != ESP_OK){
-        if((err == ESP_ERR_INVALID_STATE) && datalogger->isFileLimitReached()){
-            return ESP_OK; // simplemente no se hace nada, se prosigue. de momento
-        }
-        //Serial.println("el error tiene pinta de que es aqui"); 
-        return err; 
-    }
-/*
-    if(datalogger->appendNewDataCSVToLog(bufferTime, res.buffer, res.size)){
-         Serial.println("se escribe un nuevo dato en el buffer"); 
-    }else{
-        Serial.println("algo va mal mal");
-    }
-*/
-    return ESP_OK; 
-}
 
