@@ -30,49 +30,6 @@ public:
     AdvancedDatalogger(SDManager* sd, Datalogger* dl, RTC_DS3231* rtc, 
                        EMRegInterpreter* ri, EnergyMeter750* em);
 
-    esp_err_t begin(Struct_MBRequest mbReq);
+    esp_err_t begin(const Struct_MBRequest* mbReqs, uint16_t n_reqs);
     esp_err_t execute(); // Reemplaza a advancedDataloggerExec()
 };
-
-
-//#ifndef APP_DATALOGGER_H
-//#define APP_DATALOGGER_H
-//
-//#include "global_types.h"
-//
-//// Forward declarations
-//class EnergyMeter750;
-//class Datalogger; 
-//class RTC_DS3231;
-//class EnergyMeter750; 
-//class EMRegInterpreter; 
-//
-///**
-// * @class EnergyMeterRegInterpreter
-// * @brief Manages the parsing of CSV register maps and the conversion of raw Modbus data.
-// */
-//class AppDatalogger {
-//
-//private:
-//    //SDManager* _sd = nullptr; 
-//    //EM_request _current_request; 
-//    bool _advancedIsInitialized = false; 
-//
-//    int ultimaUnidadTiempo;
-//   
-//    unsigned long anteriorMillisModbus = 0; 
-//    //unsigned long anteriorMillisArchivo = 0; 
-//
-//    esp_err_t lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
-//    
-//public:
-//    AppDatalogger();
-//
-//    esp_err_t prepareAdvanceDatalogger(Struct_MBRequest MB_req,  EnergyMeter750* energy_meter,  Datalogger* datalogger, RTC_DS3231* rtc);
-//    esp_err_t advancedDataloggerExec(Datalogger* datalogger, EnergyMeter750* em, RTC_DS3231* rtc);
-//};
-//
-//#endif
-
-
-

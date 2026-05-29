@@ -15,6 +15,8 @@
 #define MODBUS_REQ_FILE "MBReq.csv"
 #define FIRST_BLOCK 10          ///< Number of lines to parse from the beginning of the file
 
+#define MAX_MODBUS_REQUESTS_ROWS 5 
+
 /**
  * @class ModbusRequestCSV
  * @brief Helper class to extract device parameters and Modbus requests from a CSV file on SD.
@@ -29,6 +31,11 @@ private:
 
     char _device_name[MAX_TITLES_SIZE];
     char _ip_address[MAX_TITLES_SIZE];
+
+    Struct_MBRequest _requests_table[MAX_MODBUS_REQUESTS_ROWS];
+    uint16_t _requests_count; 
+
+    esp_err_t MBRequestValidation(); 
 
 public:
     /**
@@ -62,7 +69,10 @@ public:
      * @brief Parses the CSV to extract a specific Modbus request structure.
      * @return A populated Struct_MBRequest (all zeros if parsing fails).
      */
-    esp_err_t loadFromSDMbrequest(Struct_MBRequest* out_request); 
+    esp_err_t loadFromSDMbrequests();
+
+    uint16_t getLastRequestsCount() const { return _requests_count; }
+    const Struct_MBRequest* getLastRequestsTable() const { return _requests_table; }
 };
 
 #endif

@@ -7,11 +7,15 @@ AdvancedDatalogger::AdvancedDatalogger(SDManager* sd, Datalogger* dl, RTC_DS3231
     : _sd(sd), _datalogger(dl), _rtc(rtc), _regInterpreter(ri), _energyMeter(em),
       _isInitialized(false), _anteriorMillisModbus(0), _ultimaUnidadTiempo(-1) {}
 
-esp_err_t AdvancedDatalogger::begin(Struct_MBRequest mbReq) {
-    if (mbReq.channel <= 0) return ESP_ERR_INVALID_ARG;
-    if (mbReq.length == 0 || mbReq.length > MAX_MODBUS_REGS_REQUEST) return ESP_ERR_INVALID_SIZE;
+esp_err_t AdvancedDatalogger::begin(const Struct_MBRequest* mbReqs, uint16_t n_reqs) {
 
-    esp_err_t err = _regInterpreter->startNewRequest(mbReq.start_addres, mbReq.length);
+    if(n_reqs != 1) return ESP_FAIL; 
+    //Struct_MBRequest mbReq = mbReqs[0]; // DE MOMENTO SOLO PARA HACER PRUEBAS TENEMOS EN CUENTA SOLO EL PRIMER DATO 
+    
+    if (mbReqs[0].channel <= 0) return ESP_ERR_INVALID_ARG;
+    if (mbReqs[0].length == 0 || mbReqs[0].length > MAX_MODBUS_REGS_REQUEST) return ESP_ERR_INVALID_SIZE;
+
+    esp_err_t err = _regInterpreter->startNewRequest(mbReqs[0].start_addres, mbReqs[0].length);
     if (err != ESP_OK) return err;
 
     nameColValues misTitulos = _regInterpreter->getLastNameValues();
@@ -31,6 +35,7 @@ esp_err_t AdvancedDatalogger::begin(Struct_MBRequest mbReq) {
 }
 
 esp_err_t AdvancedDatalogger::execute() {
+    
     if (!_isInitialized) return ESP_ERR_INTERPRETER_NOT_INIT;
 
     unsigned long actualMillis = millis();
@@ -55,6 +60,7 @@ esp_err_t AdvancedDatalogger::execute() {
         err = lecturaModbus();
         if (err != ESP_OK) return err;
     }
+        
     return ESP_OK;
 }
 
