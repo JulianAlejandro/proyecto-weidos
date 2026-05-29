@@ -114,7 +114,8 @@ private:
    
     int getFormatSize(coded_format f); 
     static void getNetDataString(char* dest, rawDataReg rawRegister);
-    //esp_err_t lectura_modbus(Datalogger* datalogger, RTC_DS3231* rtc, EnergyMeter750* em, EM_request req);
+    
+    // void processParserData(CSV_Parser& cp, uint16_t start, uint16_t size, uint16_t section_idx);
     void processParserData(CSV_Parser& cp, uint16_t start, uint16_t size);
 
 public:
@@ -126,7 +127,8 @@ public:
      * @return An EM_request object with the calculated total size.
      */
     //esp_err_t startNewRequest(const uint16_t start_addr, const uint16_t size, EM_request *out_request);
-    esp_err_t startNewRequest(const uint16_t start_addr, const uint16_t size);
+    //esp_err_t startNewRequest(const uint16_t start_addr, const uint16_t size); // TODO: YA VEREMOS. 
+    esp_err_t appendRequest(const uint16_t start_addr, const uint16_t size);
 
     /**
      * @brief Maps raw 16-bit arrays into the formatted rawDataReg buffer.
@@ -136,19 +138,21 @@ public:
     /**
      * @brief Gets titles for columns where 'Log' is enabled.
      */
-    nameColValues getLastNameValues();
+    nameColValues getLastNameValues(uint16_t idx_mb_section);
 
-    EM_request getLastEMRequest(); 
+    EM_request getLastEMRequest(uint16_t idx_mb_section); 
 
     /**
      * @brief Returns a buffer of formatted strings (e.g., "12.34") for the logger.
      */
-    netDataString getBufNetDataString();
+    netDataString getBufNetDataString(uint16_t idx_mb_section);
 
     coded_format stringToFormat(const char* str);
     bool isReady() { return _sd != nullptr && _initialized; }
 
     static float getFloatConversion(const uint16_t* data);
+
+    uint16_t getCountMBRequests(){return n_ModbusReqSeccions; }
 
     /**
      * @brief Loads global configuration (interval, max files) from the first lines of the CSV.
@@ -160,7 +164,8 @@ public:
     /**
      * @brief Automates the entire datalogging setup and execution.
      */
-
+    //ModbusReqSeccionDataBuffer* getDebug(){return _MB_ReqSeccionStruct; }
+    void debugMostrarTodo(); // TODO BORRAR
 };
 
 #endif

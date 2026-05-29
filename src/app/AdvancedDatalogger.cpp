@@ -15,10 +15,11 @@ esp_err_t AdvancedDatalogger::begin(const Struct_MBRequest* mbReqs, uint16_t n_r
     if (mbReqs[0].channel <= 0) return ESP_ERR_INVALID_ARG;
     if (mbReqs[0].length == 0 || mbReqs[0].length > MAX_MODBUS_REGS_REQUEST) return ESP_ERR_INVALID_SIZE;
 
-    esp_err_t err = _regInterpreter->startNewRequest(mbReqs[0].start_addres, mbReqs[0].length);
+    esp_err_t err = _regInterpreter->appendRequest(mbReqs[0].start_addres, mbReqs[0].length);
     if (err != ESP_OK) return err;
 
-    nameColValues misTitulos = _regInterpreter->getLastNameValues();
+
+    nameColValues misTitulos = _regInterpreter->getLastNameValues(0);
     if(misTitulos.size == 0) return ESP_ERR_INTERPRETER_MAP_MISS;
 
     // Recuperamos los parámetros de la SD usando tu función auxiliar
@@ -70,18 +71,18 @@ esp_err_t AdvancedDatalogger::crearNuevaSesionLog() {
     snprintf(nombreFichero, sizeof(nombreFichero), "%02d%02d%02d%02d%02d%02d", 
              ahora.year(), ahora.month(), ahora.day(), ahora.hour(), ahora.minute(), ahora.second());
 
-    nameColValues misTitulos = _regInterpreter->getLastNameValues();
+    nameColValues misTitulos = _regInterpreter->getLastNameValues(0);
     return _datalogger->newCSVLogSesion(nombreFichero, misTitulos.buffer, misTitulos.size);
 }
 
 esp_err_t AdvancedDatalogger::lecturaModbus() {
-    EM_request req = _regInterpreter->getLastEMRequest();
+    EM_request req = _regInterpreter->getLastEMRequest(0);
     esp_err_t err = _energyMeter->executeRequest(req);
     if (err != ESP_OK) return err;
 
     rawDataBuffer raw = _energyMeter->readDataBuffer();
     _regInterpreter->getBufferDataRaw(raw.buffer, raw.size);
-    netDataString res = _regInterpreter->getBufNetDataString();
+    netDataString res = _regInterpreter->getBufNetDataString(0);
 
     DateTime now = _rtc->now();
     char bufferTime[20];
