@@ -46,7 +46,7 @@ public:
 
     bool isFileLimitReached() const { return _fileLimitReached; }
 
-    uint16_t º(){ return _lastNumberColumns; }
+    uint16_t getLastNumberColumns(){ return _lastNumberColumns; }
 };
 
 #endif
