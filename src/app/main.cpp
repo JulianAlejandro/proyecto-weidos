@@ -32,7 +32,7 @@ void setup() {
     while(!Serial);
 
     if (!rtc.begin()) while(true);
-    rtc.adjust(DateTime(2026, 6, 2, 15, 16, 1));
+    rtc.adjust(DateTime(2026, 6, 2, 18, 11, 1));
 
     // Inicializaciones obligatorias de HW y archivos
     check_critical_error(sd.begin(), "Fallo en Hardware SD");

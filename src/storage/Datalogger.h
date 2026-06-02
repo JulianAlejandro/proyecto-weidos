@@ -25,6 +25,8 @@ private:
     uint32_t _currentFileSizeBytes = 0; 
     bool _fileLimitReached = false; 
     uint16_t _lastNumberColumns; 
+    uint16_t _currentTitleCount;
+    uint16_t _currentRowDataCount; 
 
     // Modificada para retornar esp_err_t ante problemas de desbordamiento o SD
     esp_err_t m_pushToBuffer(const char* csvLine); 
@@ -36,8 +38,14 @@ public:
     void setMaxFiles(uint16_t maxFiles);
 
     // Métodos para estructura CSV
-    esp_err_t newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles);
-    esp_err_t appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues); 
+    esp_err_t newCSVLogSesion(const char* current_timestamp, uint16_t numCSVColumns);
+    bool appendTitle(const char* next_title);
+
+    bool appendDataToCSVRow(const char* next_data); 
+    bool newRow(); 
+
+  //esp_err_t newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles);
+    //esp_err_t appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues); 
     
     esp_err_t appendErrorLog(const char* timestamp_msg, const char* err_message);
 

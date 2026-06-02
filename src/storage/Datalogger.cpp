@@ -69,6 +69,69 @@ void Datalogger::setMaxFiles(uint16_t maxFiles) {
     _fileManager->setMaxFiles(maxFiles);
 }
 
+esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, uint16_t numCSVColumns){
+     if (!_initialized) {
+        return ESP_ERR_DL_NOT_INIT;
+    }
+        if (numCSVColumns == 0 || current_timestamp == nullptr) {
+        return ESP_ERR_INVALID_ARG;
+    }
+        // Si el buffer tiene datos rezagados del archivo anterior, los forzamos a guardarse
+    if (_buffer.getCurrentSize() > 0 && _logPath[0] != '\0') {
+        ESP_LOGI(TAG, "Vaciando buffer remanente antes de abrir nueva sesión...");
+        esp_err_t flushErr = flushBuffer();
+        if (flushErr != ESP_OK) return flushErr;
+    }
+
+    esp_err_t err;
+    // Solicitar nuevo archivo físico basado en el timestamp de control
+    if (_fileManager->requiresTimestamp()){
+        err = _fileManager->newFileLog(current_timestamp);
+    }else{
+        err = _fileManager->newFileLog();
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "No se pudo generar el nuevo archivo de log en FileManager [0x%X]", err);
+        return err;
+    }
+
+       char* currentLogPtr = _fileManager->getCurrentLogPath();
+    if (currentLogPtr != nullptr && currentLogPtr[0] != '\0') {
+        strncpy(_logPath, currentLogPtr, sizeof(_logPath) - 1);
+        _logPath[sizeof(_logPath) - 1] = '\0'; 
+
+        _currentFileSizeBytes = 0;
+        _fileLimitReached = false;
+    } else {
+        _logPath[0] = '\0';
+        return ESP_ERR_NOT_FOUND; 
+    }
+
+    
+    // Construcción segura de la cabecera CSV
+    //char tempLine[256] = "Timestamp;"; 
+//
+    //for (uint16_t i = 0; i < numTitles; i++) {
+    //    if (titles[i] != nullptr) {
+    //        strncat(tempLine, titles[i], sizeof(tempLine) - strlen(tempLine) - 1);
+    //    }
+    //    if (i < numTitles - 1) {
+    //        strncat(tempLine, ";", sizeof(tempLine) - strlen(tempLine) - 1);
+    //    }
+    //}
+    //strncat(tempLine, "\n", sizeof(tempLine) - strlen(tempLine) - 1); 
+
+    // Inserción en el buffer RAM
+    
+    _lastNumberColumns = numCSVColumns;
+    _currentTitleCount = 0;
+    _currentRowDataCount = 0; 
+
+    //return m_pushToBuffer(tempLine);
+    return ESP_OK; 
+
+}
+/*
 esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles) {
     if (!_initialized) {
         return ESP_ERR_DL_NOT_INIT;
@@ -126,8 +189,90 @@ esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char*
 
     return m_pushToBuffer(tempLine);
 }
+*/
 
+bool Datalogger::appendTitle(const char* next_title) {
+    if (!_initialized || next_title == nullptr || _logPath[0] == '\0') {
+        return false;
+    }
 
+    if (_currentTitleCount >= _lastNumberColumns) {
+        ESP_LOGW(TAG, "appendTitle: Intento de añadir más títulos del límite configurado (%d)", _lastNumberColumns);
+        return false;
+    }
+
+    static char headerConstructionBuffer[512] = "";
+
+    // Concatenamos de forma segura el título actual
+    strlcat(headerConstructionBuffer, next_title, sizeof(headerConstructionBuffer));
+    _currentTitleCount++;
+
+    // Verificar si es el último título esperado para cerrar la línea de cabecera
+    if (_currentTitleCount == _lastNumberColumns) {
+        strlcat(headerConstructionBuffer, "\n", sizeof(headerConstructionBuffer));
+
+        esp_err_t err = m_pushToBuffer(headerConstructionBuffer);
+        
+        // ¡IMPORTANTE! Limpieza inmediata del buffer pase lo que pase con la SD
+        headerConstructionBuffer[0] = '\0';
+
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "appendTitle: Error al empujar la cabecera construida [0x%X]", err);
+            return false;
+        }
+        ESP_LOGI(TAG, "Cabecera CSV generada y guardada en buffer exitosamente.");
+    } else {
+        strlcat(headerConstructionBuffer, ";", sizeof(headerConstructionBuffer));
+    }
+
+    return true;
+}
+
+bool Datalogger::appendDataToCSVRow(const char* next_data) {
+    if (!_initialized || next_data == nullptr || _logPath[0] == '\0') {
+        return false;
+    }
+    
+    if (_currentRowDataCount >= _lastNumberColumns) {
+        ESP_LOGW(TAG, "appendData: Intento de añadir más datos en una línea del límite configurado (%d)", _lastNumberColumns);
+        return false;
+    }
+
+    static char constructionBuffer[512] = "";
+
+    strlcat(constructionBuffer, next_data, sizeof(constructionBuffer));
+    _currentRowDataCount++;
+
+    // Verificar si la fila actual está completa
+    if (_currentRowDataCount == _lastNumberColumns) {
+        strlcat(constructionBuffer, "\n", sizeof(constructionBuffer));
+
+        esp_err_t err = m_pushToBuffer(constructionBuffer);
+        
+        // ¡IMPORTANTE! Limpieza obligatoria del buffer de construcción
+        constructionBuffer[0] = '\0';
+        
+        // Reinicio automático del conteo para blindar el sistema contra olvidos de llamadas a newRow()
+        _currentRowDataCount = 0; 
+
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "appendData: Error al empujar el buffer construido [0x%X]", err);
+            return false;
+        }
+        ESP_LOGD(TAG, "Fila de datos completada y guardada en buffer.");
+    } else {
+        strlcat(constructionBuffer, ";", sizeof(constructionBuffer));
+    }
+    return true;
+}
+
+bool Datalogger::newRow() {
+    // Como ahora el reinicio es automático en appendDataToCSVRow al llegar al final,
+    // esta función sirve para verificar si la línea previa cerró de forma perfecta (está lista en 0)
+    return (_currentRowDataCount == 0); 
+}
+
+/*
 esp_err_t Datalogger::appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues) {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
     if(numValues != _lastNumberColumns) return ESP_ERR_INVALID_ARG; 
@@ -147,7 +292,7 @@ esp_err_t Datalogger::appendNewDataCSVToLog(const char* timestamp_msg, const cha
 
     return m_pushToBuffer(tempLine);
 }
-
+*/
 
 // Callback privado auxiliar para interactuar con la interfaz Stream de la SD
 void flushLogBufferCallback(Stream& stream, void* context) {
