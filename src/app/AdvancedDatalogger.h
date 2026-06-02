@@ -18,7 +18,7 @@ private:
     bool _isInitialized;
     Parameters _param;
     int _logInterval;
-    int _maxFiles;
+    //int _maxFiles;
     unsigned long _anteriorMillisModbus;
     int _ultimaUnidadTiempo;
 

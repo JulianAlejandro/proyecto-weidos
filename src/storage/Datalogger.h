@@ -24,6 +24,7 @@ private:
 
     uint32_t _currentFileSizeBytes = 0; 
     bool _fileLimitReached = false; 
+    uint16_t _lastNumberColumns; 
 
     // Modificada para retornar esp_err_t ante problemas de desbordamiento o SD
     esp_err_t m_pushToBuffer(const char* csvLine); 
@@ -44,6 +45,8 @@ public:
     esp_err_t flushBuffer();
 
     bool isFileLimitReached() const { return _fileLimitReached; }
+
+    uint16_t º(){ return _lastNumberColumns; }
 };
 
 #endif

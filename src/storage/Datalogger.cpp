@@ -60,7 +60,7 @@ esp_err_t Datalogger::begin() {
         _fileLimitReached = false;
         ESP_LOGI(TAG, "Entorno inicializado limpio (sin logs previos en la carpeta).");
     }
-
+    _lastNumberColumns = 0; 
     _initialized = true;
     return ESP_OK;
 }
@@ -122,12 +122,15 @@ esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char*
     strncat(tempLine, "\n", sizeof(tempLine) - strlen(tempLine) - 1); 
 
     // Inserción en el buffer RAM
+    _lastNumberColumns = numTitles;
+
     return m_pushToBuffer(tempLine);
 }
 
 
 esp_err_t Datalogger::appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues) {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
+    if(numValues != _lastNumberColumns) return ESP_ERR_INVALID_ARG; 
     if (_logPath[0] == '\0') return ESP_ERR_INVALID_STATE;
     if (timestamp_msg == nullptr || values == nullptr || numValues == 0) return ESP_ERR_INVALID_ARG;
 

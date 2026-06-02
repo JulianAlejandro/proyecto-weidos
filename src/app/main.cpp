@@ -32,7 +32,7 @@ void setup() {
     while(!Serial);
 
     if (!rtc.begin()) while(true);
-    rtc.adjust(DateTime(2026, 5, 29, 13, 10, 1));
+    rtc.adjust(DateTime(2026, 6, 2, 15, 16, 1));
 
     // Inicializaciones obligatorias de HW y archivos
     check_critical_error(sd.begin(), "Fallo en Hardware SD");
@@ -65,7 +65,7 @@ void setup() {
     Log_msg::registerCallback(onEnergyMeterError); 
 
     // ¡Arrancamos el motor! El orquestador toma el control
-    check_critical_error(loggerEngine.begin(table_reqs, n_requests), "No se pudo iniciar la sesión");
+    check_critical_error(loggerEngine.begin(table_reqs, n_requests), "Fallo al iniciar el Logger engine");
 }
 
 void loop() {
