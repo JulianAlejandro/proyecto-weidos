@@ -31,7 +31,7 @@
 #define SIZE_BYTE    1
 #define SIZE_DFLOAT  1
 
-#define MAX_MB_REQ_SECCIONS 4
+#define MAX_MB_REQ_SECTIONS 4
 
 /**
  * @enum coded_format
@@ -87,7 +87,7 @@ struct netDataString {
 };
 
 
-struct ModbusReqSeccionDataBuffer{
+struct ModbusReqSectionDataBuffer{
     EM_request current_request; // Para esa seccion de solicitud modbus hay una request para el EM especifica
 
     RegisterEntry registryBuffer[MAX_MODBUS_REGS]; // captura metadatos de los registros a leer 
@@ -108,8 +108,8 @@ private:
     SDManager* _sd = nullptr; // unico, general
     bool _initialized = false; 
 
-    ModbusReqSeccionDataBuffer _MB_ReqSeccionStruct[MAX_MB_REQ_SECCIONS]; // almacena toda la informacion necesaria para gestionar una solicitud modbus y su procesamiento
-    uint16_t _nModbusReqSeccions; 
+    ModbusReqSectionDataBuffer _MB_ReqSectionStruct[MAX_MB_REQ_SECTIONS]; // almacena toda la informacion necesaria para gestionar una solicitud modbus y su procesamiento
+    uint16_t _nModbusReqSections; 
    
     int getFormatSize(coded_format f); 
     static void getNetDataString(char* dest, rawDataReg rawRegister);
@@ -151,7 +151,14 @@ public:
 
     static float getFloatConversion(const uint16_t* data);
 
-    uint16_t getCountMBRequests(){return _nModbusReqSeccions; }
+    uint16_t getCountMBRequests(){return _nModbusReqSections; }
+    uint16_t getCountRegsInSection(uint16_t idx_mb_section);
+    uint16_t getCountAllRegsLoaded(); 
+
+    // funciones de obtencion de datos de otra manera
+    bool getLogsRegs(uint16_t idx_mb_section, uint16_t idx_reg); 
+    char* getNameRegs(uint16_t idx_mb_section, uint16_t idx_reg);
+    char* getValueRegs(uint16_t idx_mb_section, uint16_t idx_reg); 
 
     /**
      * @brief Loads global configuration (interval, max files) from the first lines of the CSV.
@@ -163,7 +170,7 @@ public:
     /**
      * @brief Automates the entire datalogging setup and execution.
      */
-    //ModbusReqSeccionDataBuffer* getDebug(){return _MB_ReqSeccionStruct; }
+    //ModbusReqSectionDataBuffer* getDebug(){return _MB_ReqSectionStruct; }
     void debugMostrarTodo(); // TODO BORRAR
 };
 

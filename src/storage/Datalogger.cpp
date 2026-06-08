@@ -365,3 +365,61 @@ esp_err_t Datalogger::appendErrorLog(const char* timestamp_msg, const char* err_
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
     return _fileManager->appendErrorLog(timestamp_msg, err_message); 
 }
+
+
+esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles) {
+    if (!_initialized) return ESP_ERR_DL_NOT_INIT;
+    if (titles == nullptr || numTitles == 0 || current_timestamp == nullptr) return ESP_ERR_INVALID_ARG;
+
+    // Inicializamos la sesión base configurando el número total de columnas
+    // Ojo: El número total de columnas ahora es numTitles + 1 (por el Timestamp)
+    esp_err_t err = newCSVLogSesion(current_timestamp, numTitles + 1);
+    if (err != ESP_OK) return err;
+
+    // Construcción segura de la cabecera en un buffer local temporal
+    char tempLine[512] = "Timestamp;"; 
+
+    for (uint16_t i = 0; i < numTitles; i++) {
+        if (titles[i] != nullptr) {
+            strlcat(tempLine, titles[i], sizeof(tempLine));
+        }
+        if (i < numTitles - 1) {
+            strlcat(tempLine, ";", sizeof(tempLine));
+        }
+    }
+    strlcat(tempLine, "\n", sizeof(tempLine)); 
+
+    // Insertamos directamente en el buffer de la RAM
+    return m_pushToBuffer(tempLine);
+}
+
+
+esp_err_t Datalogger::appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues) {
+    if (!_initialized) return ESP_ERR_DL_NOT_INIT;
+    if (_logPath[0] == '\0') return ESP_ERR_INVALID_STATE;
+    if (timestamp_msg == nullptr || values == nullptr || numValues == 0) return ESP_ERR_INVALID_ARG;
+
+    // Validación de columnas: El array 'values' debe tener exactamente 
+    // una columna menos que el total (ya que la primera es el Timestamp).
+    if ((numValues + 1) != _lastNumberColumns) {
+        ESP_LOGW(TAG, "appendNewData: Cantidad de columnas inválida. Esperadas: %d, Recibidas: %d", _lastNumberColumns - 1, numValues);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Construcción del string de la fila completa en RAM temporal
+    char tempLine[512]; 
+    snprintf(tempLine, sizeof(tempLine), "%s;", timestamp_msg);
+
+    for (uint16_t i = 0; i < numValues; i++) {
+        if (values[i] != nullptr) {
+            strlcat(tempLine, values[i], sizeof(tempLine));
+        }
+        if (i < numValues - 1) {
+            strlcat(tempLine, ";", sizeof(tempLine));
+        }
+    }
+    strlcat(tempLine, "\n", sizeof(tempLine)); 
+
+    // Enviamos la fila completa al buffer principal
+    return m_pushToBuffer(tempLine);
+}

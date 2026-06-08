@@ -21,25 +21,10 @@ esp_err_t AdvancedDatalogger::begin(const Struct_MBRequest* mbReqs, uint16_t n_r
          ESP_LOGD(TAG, "Solicitud con Modbus con addr: %d y size %d cargada en interpretador mapas de registros",mbReqs[i].start_addres, mbReqs[i].length );
     }
     uint16_t n_reqs_aux = _regInterpreter->getCountMBRequests();
-    if((n_reqs_aux <= 0) || (n_reqs_aux > MAX_MB_REQ_SECCIONS)) return ESP_FAIL;  
+    if((n_reqs_aux <= 0) || (n_reqs_aux > MAX_MB_REQ_SECTIONS)) return ESP_FAIL;  
 
     ESP_LOGD(TAG, "Cargadas en el mapa de registro %d solicitudes modbus", n_reqs_aux);
-/*
-    uint16_t n_reqs_aux = _regInterpreter->getCountMBRequests(); 
 
-    for ( int i = 0; i < n_reqs_aux; i++){ 
-        //misTitulos.buffer = nullptr; 
-        //misTitulos.size = 0; 
-        nameColValues misTitulos = _regInterpreter->getLastNameValues(i);
-        Serial.print("cambiamos de mb req con numero de titulos:");
-        Serial.println(misTitulos.size);
-        for(int j = 0; j < misTitulos.size; j++){ 
-            Serial.println(misTitulos.buffer[j]); 
-        }
-        if(misTitulos.size == 0) return ESP_ERR_INTERPRETER_MAP_MISS;  
-    }
-    return ESP_FAIL; 
-*/
     // Recuperamos los parámetros de la SD usando tu función auxiliar lo hacemos aqui para usar la SD una unica vez 
     _param = SDgetParameters(_sd);
     _logInterval = atoi(_param.log_interval);
@@ -93,14 +78,10 @@ esp_err_t AdvancedDatalogger::crearNuevaSesionLog() {
     uint16_t n_reqs_aux = _regInterpreter->getCountMBRequests();
 
     // Calculamos el total de columnas dinámicas de los mapas Modbus
-    uint16_t totalTitulos = 0;
-    for (int i = 0; i < n_reqs_aux; i++) {
-        nameColValues misTitulos = _regInterpreter->getLastNameValues(i);         
-        totalTitulos += misTitulos.size;
-    }
+    uint16_t totalDataCount = _regInterpreter->getCountAllRegsLoaded(); 
 
     // Inicializamos la sesión en el datalogger añadiendo el +1 para el Timestamp
-    esp_err_t err = _datalogger->newCSVLogSesion(nombreFichero, totalTitulos + 1);
+    esp_err_t err = _datalogger->newCSVLogSesion(nombreFichero, totalDataCount + 1);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error al crear la sesion CSV [0x%X]", err);
         return err;
@@ -133,7 +114,7 @@ DateTime ahora = _rtc->now();
     uint16_t n_reqs_aux = _regInterpreter->getCountMBRequests();
 
     // Creamos un contenedor único para albergar todos los títulos consolidados
-    //const char* titulosConsolidados[MAX_MODBUS_REGS * MAX_MB_REQ_SECCIONS];
+    //const char* titulosConsolidados[MAX_MODBUS_REGS * MAX_MB_REQ_SECTIONS];
 
     uint16_t totalTitulos = 0;
     Serial.println("aqui van los titulos: "); 
@@ -231,7 +212,7 @@ esp_err_t AdvancedDatalogger::lecturaModbus() {
 /*
     uint16_t n_reqs_aux = _regInterpreter->getCountMBRequests();
 
-    //const char* completeData[MAX_MODBUS_REGS * MAX_MB_REQ_SECCIONS];
+    //const char* completeData[MAX_MODBUS_REGS * MAX_MB_REQ_SECTIONS];
     //uint16_t n_completeData = 0;
     //Serial.println("aqui van los datos: "); 
     for (int i = 0; i < n_reqs_aux; i++) {

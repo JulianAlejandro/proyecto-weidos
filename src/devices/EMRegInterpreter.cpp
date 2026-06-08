@@ -25,10 +25,10 @@ struct StreamContext {
 EMRegInterpreter::EMRegInterpreter(SDManager* sdManager)
   : _sd(sdManager) 
 {
-    for(int i = 0; i < MAX_MB_REQ_SECCIONS; i++){
-        _MB_ReqSeccionStruct[i].registrySize = 0;
+    for(int i = 0; i < MAX_MB_REQ_SECTIONS; i++){
+        _MB_ReqSectionStruct[i].registrySize = 0;
     }
-    _nModbusReqSeccions = 0; 
+    _nModbusReqSections = 0; 
 }
 
 /**
@@ -57,8 +57,8 @@ esp_err_t EMRegInterpreter::begin(){
 
     int totalRows = cp.getRowsCount();
     // ¡Usamos section_idx aquí!
-    uint16_t idx_MB_Seccions = _nModbusReqSeccions-1; 
-    _MB_ReqSeccionStruct[idx_MB_Seccions].registrySize = 0; 
+    uint16_t idx_MB_Sections = _nModbusReqSections-1; 
+    _MB_ReqSectionStruct[idx_MB_Sections].registrySize = 0; 
 
     for (int i = 0; i < totalRows; i++) {
         uint16_t addr = (uint16_t)addrs[i];
@@ -66,32 +66,32 @@ esp_err_t EMRegInterpreter::begin(){
         // Filter by the requested address range
         if (addr >= start && addr < (start + size)) {
             
-            if (_MB_ReqSeccionStruct[idx_MB_Seccions].registrySize >= MAX_MODBUS_REGS) {
+            if (_MB_ReqSectionStruct[idx_MB_Sections].registrySize >= MAX_MODBUS_REGS) {
                 break;
             }
 
             coded_format fmtEnum = stringToFormat(formats[i]);
             
             if (fmtEnum != FORMAT_UNKNOWN) {
-                int idx = _MB_ReqSeccionStruct[idx_MB_Seccions].registrySize;
+                int idx = _MB_ReqSectionStruct[idx_MB_Sections].registrySize;
                 
-                _MB_ReqSeccionStruct[idx_MB_Seccions].registryBuffer[idx].format = fmtEnum;
-                _MB_ReqSeccionStruct[idx_MB_Seccions].registryBuffer[idx].address = addr;
+                _MB_ReqSectionStruct[idx_MB_Sections].registryBuffer[idx].format = fmtEnum;
+                _MB_ReqSectionStruct[idx_MB_Sections].registryBuffer[idx].address = addr;
 
                 // Determine if logging is enabled for this register
-                _MB_ReqSeccionStruct[idx_MB_Seccions].registryBuffer[idx].logEnabled = (strcasecmp(logs[i], "Yes") == 0);
+                _MB_ReqSectionStruct[idx_MB_Sections].registryBuffer[idx].logEnabled = (strcasecmp(logs[i], "Yes") == 0);
                 
                 // Store register name
                 if (names[i] != nullptr) {
-                    strncpy(_MB_ReqSeccionStruct[idx_MB_Seccions].registryBuffer[idx].name, names[i], MAX_TITLES_SIZE - 1);
-                    _MB_ReqSeccionStruct[idx_MB_Seccions].registryBuffer[idx].name[MAX_TITLES_SIZE - 1] = '\0';
+                    strncpy(_MB_ReqSectionStruct[idx_MB_Sections].registryBuffer[idx].name, names[i], MAX_TITLES_SIZE - 1);
+                    _MB_ReqSectionStruct[idx_MB_Sections].registryBuffer[idx].name[MAX_TITLES_SIZE - 1] = '\0';
                 } else {
-                    strcpy(_MB_ReqSeccionStruct[idx_MB_Seccions].registryBuffer[idx].name, "Unknown");
+                    strcpy(_MB_ReqSectionStruct[idx_MB_Sections].registryBuffer[idx].name, "Unknown");
                 }
 
                 // Update the cumulative Modbus request size
-                _MB_ReqSeccionStruct[idx_MB_Seccions].current_request.size += getFormatSize(fmtEnum);
-                _MB_ReqSeccionStruct[idx_MB_Seccions].registrySize++;
+                _MB_ReqSectionStruct[idx_MB_Sections].current_request.size += getFormatSize(fmtEnum);
+                _MB_ReqSectionStruct[idx_MB_Sections].registrySize++;
             }
         }
     }
@@ -99,20 +99,20 @@ esp_err_t EMRegInterpreter::begin(){
 
 esp_err_t EMRegInterpreter::appendRequest(const uint16_t start_addr, const uint16_t size) {
     if(!_initialized) return ESP_ERR_INTERPRETER_NOT_INIT;
-    _nModbusReqSeccions++; 
+    _nModbusReqSections++; 
 
-    // 1. Validar si ya alcanzamos el límite máximo de secciones permitidas
-    if (_nModbusReqSeccions >= MAX_MB_REQ_SECCIONS) {
+    // 1. Validar si ya alcanzamos el límite máximo de sectiones permitidas
+    if (_nModbusReqSections >= MAX_MB_REQ_SECTIONS) {
         return ESP_ERR_INVALID_SIZE; // O un código personalizado como ESP_ERR_INTERPRETER_BAD_CONF
     }
 
     // El índice donde guardaremos será el valor actual del contador
-    uint16_t idx_mb_seccion = _nModbusReqSeccions-1;
+    uint16_t idx_mb_section = _nModbusReqSections-1;
 
     // 2. Limpiar la estructura en esa posición específica
-    _MB_ReqSeccionStruct[idx_mb_seccion].current_request.start_addr = 0;
-    _MB_ReqSeccionStruct[idx_mb_seccion].current_request.size = 0;
-    _MB_ReqSeccionStruct[idx_mb_seccion].registrySize = 0;
+    _MB_ReqSectionStruct[idx_mb_section].current_request.start_addr = 0;
+    _MB_ReqSectionStruct[idx_mb_section].current_request.size = 0;
+    _MB_ReqSectionStruct[idx_mb_section].registrySize = 0;
 
     // 3. Crear contexto apuntando a 'current_idx'
     StreamContext ctx = {this, start_addr, size};
@@ -138,19 +138,18 @@ esp_err_t EMRegInterpreter::appendRequest(const uint16_t start_addr, const uint1
     if (err != ESP_OK) return err;
     
     // Si el rango pedido no encontró ningún registro coincidente en el mapa CSV
-    if (_MB_ReqSeccionStruct[idx_mb_seccion].registrySize == 0) {
+    if (_MB_ReqSectionStruct[idx_mb_section].registrySize == 0) {
         return ESP_ERR_INTERPRETER_MAP_MISS;
     }
    
     // Ajustamos la dirección de inicio real en base al primer registro válido mapeado
-    _MB_ReqSeccionStruct[idx_mb_seccion].current_request.start_addr = _MB_ReqSeccionStruct[idx_mb_seccion].registryBuffer[0].address; 
+    _MB_ReqSectionStruct[idx_mb_section].current_request.start_addr = _MB_ReqSectionStruct[idx_mb_section].registryBuffer[0].address; 
     
-    // 4. ¡ÉXITO! Incrementamos de forma segura el contador de secciones cargadas // esto daba error a la hora de leer 
-    //n_ModbusReqSeccions++;
+    // 4. ¡ÉXITO! Incrementamos de forma segura el contador de sectiones cargadas // esto daba error a la hora de leer 
+    //n_ModbusReqSections++;
     
     return ESP_OK;
 }
-
 
 
 /**
@@ -158,30 +157,32 @@ esp_err_t EMRegInterpreter::appendRequest(const uint16_t start_addr, const uint1
  */
 bufRawDataReg EMRegInterpreter::getBufferDataRaw(const uint16_t* data_readed, const uint16_t size, uint16_t idx_mb_section) {
     bufRawDataReg res;
-    //uint16_t idx_mb_section = _nModbusReqSeccions; 
-    res.buffer = _MB_ReqSeccionStruct[idx_mb_section].RawDataBuffer; 
-    res.size = 0;
+    res.buffer = nullptr; 
+    res.size = 0; 
 
     if(!_initialized) return res;
-
+    if(idx_mb_section > _nModbusReqSections) return res; 
+    
+    res.buffer = _MB_ReqSectionStruct[idx_mb_section].RawDataBuffer; 
+    
     uint16_t offsetOriginal = 0; 
 
-    for (int i = 0; i < _MB_ReqSeccionStruct[idx_mb_section].registrySize; i++) {
-        coded_format fmt = _MB_ReqSeccionStruct[idx_mb_section].registryBuffer[i].format;
+    for (int i = 0; i < _MB_ReqSectionStruct[idx_mb_section].registrySize; i++) {
+        coded_format fmt = _MB_ReqSectionStruct[idx_mb_section].registryBuffer[i].format;
         int regs_del_dato = getFormatSize(fmt);
 
         if (offsetOriginal + regs_del_dato > size) break;
 
-        _MB_ReqSeccionStruct[idx_mb_section].RawDataBuffer[i].format = fmt;
+        _MB_ReqSectionStruct[idx_mb_section].RawDataBuffer[i].format = fmt;
         
         // Populate the 16-bit internal buffer for each data point
         for (int j = 0; j < regs_del_dato; j++) {
-            _MB_ReqSeccionStruct[idx_mb_section].RawDataBuffer[i].data[j] = data_readed[offsetOriginal + j];
+            _MB_ReqSectionStruct[idx_mb_section].RawDataBuffer[i].data[j] = data_readed[offsetOriginal + j];
         }
 
         // Clear remaining space in buffer
         for (int j = regs_del_dato; j < MAX_DATA_SIZE; j++) {
-            _MB_ReqSeccionStruct[idx_mb_section].RawDataBuffer[i].data[j] = 0;
+            _MB_ReqSectionStruct[idx_mb_section].RawDataBuffer[i].data[j] = 0;
         }
 
         offsetOriginal += regs_del_dato;
@@ -210,11 +211,13 @@ nameColValues EMRegInterpreter::getLastNameValues(uint16_t idx_mb_section) {
     nameColValues res;
     int count = 0; 
     res.size = 0;
+    if(!_initialized) return res;
+    if(idx_mb_section > _nModbusReqSections) return res; 
 
-    for (int i = 0; i < _MB_ReqSeccionStruct[idx_mb_section].registrySize; i++) {
-        if (_MB_ReqSeccionStruct[idx_mb_section].registryBuffer[i].logEnabled) {
+    for (int i = 0; i < _MB_ReqSectionStruct[idx_mb_section].registrySize; i++) {
+        if (_MB_ReqSectionStruct[idx_mb_section].registryBuffer[i].logEnabled) {
             if (count < MAX_MODBUS_REGS) {
-                res.buffer[count] = _MB_ReqSeccionStruct[idx_mb_section].registryBuffer[i].name;
+                res.buffer[count] = _MB_ReqSectionStruct[idx_mb_section].registryBuffer[i].name;
                 count++;
             }
         }
@@ -225,7 +228,12 @@ nameColValues EMRegInterpreter::getLastNameValues(uint16_t idx_mb_section) {
 }
 
 EM_request EMRegInterpreter::getLastEMRequest(uint16_t idx_mb_section){
-    return _MB_ReqSeccionStruct[idx_mb_section].current_request; 
+
+    if(idx_mb_section > _nModbusReqSections){
+        return {0,0}; 
+    } 
+
+    return _MB_ReqSectionStruct[idx_mb_section].current_request;; 
 }
 
 /**
@@ -271,13 +279,15 @@ netDataString EMRegInterpreter::getBufNetDataString(uint16_t idx_mb_section) {
     netDataString res;
     res.size = 0;
     int count = 0; 
+    if(!_initialized) return res;
+    if(idx_mb_section > _nModbusReqSections) return res; 
 
-    for (int i = 0; i < _MB_ReqSeccionStruct[idx_mb_section].registrySize; i++) {
-        if(_MB_ReqSeccionStruct[idx_mb_section].registryBuffer[i].logEnabled){
-            getNetDataString(_MB_ReqSeccionStruct[idx_mb_section].netDataStringBuffer[i], _MB_ReqSeccionStruct[idx_mb_section].RawDataBuffer[i]);
+    for (int i = 0; i < _MB_ReqSectionStruct[idx_mb_section].registrySize; i++) {
+        if(_MB_ReqSectionStruct[idx_mb_section].registryBuffer[i].logEnabled){
+            getNetDataString(_MB_ReqSectionStruct[idx_mb_section].netDataStringBuffer[i], _MB_ReqSectionStruct[idx_mb_section].RawDataBuffer[i]);
 
             if (count < MAX_MODBUS_REGS) {
-                res.buffer[count] = _MB_ReqSeccionStruct[idx_mb_section].netDataStringBuffer[i];
+                res.buffer[count] = _MB_ReqSectionStruct[idx_mb_section].netDataStringBuffer[i];
                 count++;
             }
         }    
@@ -342,20 +352,52 @@ void EMRegInterpreter::getNetDataString(char* dest, rawDataReg rawRegister){
 } 
 
 void EMRegInterpreter::debugMostrarTodo(){
-    
+  /*  
     // quiero una funcion que me muestre por serial lo que hay dentro de la estuctrutura
     Serial.print("mostramos a ver:::"); 
     Serial.print("idx:");
-    Serial.println(_nModbusReqSeccions); 
-    Serial.println(_MB_ReqSeccionStruct[_nModbusReqSeccions].registryBuffer[0].name);
-    Serial.println(_MB_ReqSeccionStruct[_nModbusReqSeccions].registryBuffer[1].name);
-    Serial.println(_MB_ReqSeccionStruct[_nModbusReqSeccions].registryBuffer[2].name);
-    Serial.println(_MB_ReqSeccionStruct[_nModbusReqSeccions].registryBuffer[3].name);
-    Serial.println(_MB_ReqSeccionStruct[_nModbusReqSeccions].registryBuffer[4].name);
-    Serial.println(_MB_ReqSeccionStruct[_nModbusReqSeccions].registryBuffer[5].name);
-    Serial.println(_MB_ReqSeccionStruct[_nModbusReqSeccions].registryBuffer[6].name);
-
+    Serial.println(_nModbusReqSections); 
+    Serial.println(_MB_ReqSectionStruct[_nModbusReqSections].registryBuffer[0].name);
+    Serial.println(_MB_ReqSectionStruct[_nModbusReqSections].registryBuffer[1].name);
+    Serial.println(_MB_ReqSectionStruct[_nModbusReqSections].registryBuffer[2].name);
+    Serial.println(_MB_ReqSectionStruct[_nModbusReqSections].registryBuffer[3].name);
+    Serial.println(_MB_ReqSectionStruct[_nModbusReqSections].registryBuffer[4].name);
+    Serial.println(_MB_ReqSectionStruct[_nModbusReqSections].registryBuffer[5].name);
+    Serial.println(_MB_ReqSectionStruct[_nModbusReqSections].registryBuffer[6].name);
+*/
 
 }
 
 
+uint16_t EMRegInterpreter::getCountRegsInSection(uint16_t idx_mb_section){
+
+    if(!_initialized) return 0;
+    if(idx_mb_section > _nModbusReqSections) return 0; 
+
+    return _MB_ReqSectionStruct[idx_mb_section].registrySize; 
+    
+}
+
+uint16_t EMRegInterpreter::getCountAllRegsLoaded(){
+    if(!_initialized) return 0;
+    
+    uint16_t count_res = 0;
+    
+    for (int i = 0; i < _nModbusReqSections; i++){
+        count_res = count_res + _MB_ReqSectionStruct[i].registrySize; 
+    }
+    return count_res; 
+}
+
+
+bool EMRegInterpreter::getLogsRegs(uint16_t idx_mb_section, uint16_t idx_reg){
+    return _MB_ReqSectionStruct[idx_mb_section].registryBuffer[idx_reg].logEnabled; 
+}
+
+char* EMRegInterpreter::getNameRegs(uint16_t idx_mb_section, uint16_t idx_reg){
+    return _MB_ReqSectionStruct[idx_mb_section].registryBuffer[idx_reg].name; 
+}
+
+char* EMRegInterpreter::getValueRegs(uint16_t idx_mb_section, uint16_t idx_reg){
+    return _MB_ReqSectionStruct[idx_mb_section].netDataStringBuffer[idx_reg];
+}

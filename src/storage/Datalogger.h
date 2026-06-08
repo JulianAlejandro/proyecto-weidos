@@ -44,8 +44,9 @@ public:
     bool appendDataToCSVRow(const char* next_data); 
     bool newRow(); 
 
-  //esp_err_t newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles);
-    //esp_err_t appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues); 
+    // otra manera de añadir datos 
+    esp_err_t newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles);
+    esp_err_t appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues); 
     
     esp_err_t appendErrorLog(const char* timestamp_msg, const char* err_message);
 

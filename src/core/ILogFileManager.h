@@ -7,8 +7,8 @@
 #define MAX_LOG_CAPACITY 150
 
 #define ESP_ERR_DL_BASE           0x9000
-#define ESP_ERR_SD_NOT_INIT       (ESP_ERR_DL_BASE + 1)
-#define ESP_ERR_SD_WRITE_FAIL     (ESP_ERR_DL_BASE + 2)
+#define ESP_ERR_SD_NOT_INIT_LOG   (ESP_ERR_DL_BASE + 1)
+#define ESP_ERR_SD_WRITE_FAIL_LOG (ESP_ERR_DL_BASE + 2)
 #define ESP_ERR_DL_PAST_TIME      (ESP_ERR_DL_BASE + 3)
 #define ESP_ERR_DL_NOT_INIT       (ESP_ERR_DL_BASE + 4)
 
