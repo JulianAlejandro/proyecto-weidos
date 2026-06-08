@@ -391,13 +391,16 @@ uint16_t EMRegInterpreter::getCountAllRegsLoaded(){
 
 
 bool EMRegInterpreter::getLogsRegs(uint16_t idx_mb_section, uint16_t idx_reg){
+    if(idx_mb_section > MAX_MB_REQ_SECTIONS || idx_reg > MAX_MODBUS_REGS) return false; // Valor por defecto
     return _MB_ReqSectionStruct[idx_mb_section].registryBuffer[idx_reg].logEnabled; 
 }
 
 char* EMRegInterpreter::getNameRegs(uint16_t idx_mb_section, uint16_t idx_reg){
+    if(idx_mb_section > MAX_MB_REQ_SECTIONS || idx_reg > MAX_MODBUS_REGS) return nullptr; 
     return _MB_ReqSectionStruct[idx_mb_section].registryBuffer[idx_reg].name; 
 }
 
 char* EMRegInterpreter::getValueRegs(uint16_t idx_mb_section, uint16_t idx_reg){
+    if(idx_mb_section > MAX_MB_REQ_SECTIONS || idx_reg > MAX_MODBUS_REGS) return nullptr; 
     return _MB_ReqSectionStruct[idx_mb_section].netDataStringBuffer[idx_reg];
 }

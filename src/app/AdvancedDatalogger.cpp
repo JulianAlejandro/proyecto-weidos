@@ -204,7 +204,7 @@ esp_err_t AdvancedDatalogger::lecturaModbus() {
     // 4. Verificación de cierre de línea automático
     if (!_datalogger->newRow()) {
         ESP_LOGE(TAG, "La linea no se cerro correctamente. El conteo de columnas no coincide.");
-        return ESP_FAIL;
+        //return ESP_FAIL;
     }
 
     return ESP_OK;

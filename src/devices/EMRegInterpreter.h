@@ -86,7 +86,6 @@ struct netDataString {
     uint16_t size; 
 };
 
-
 struct ModbusReqSectionDataBuffer{
     EM_request current_request; // Para esa seccion de solicitud modbus hay una request para el EM especifica
 

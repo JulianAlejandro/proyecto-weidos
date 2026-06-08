@@ -191,6 +191,36 @@ esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char*
 }
 */
 
+
+bool Datalogger::appendTitle(const char* next_title) {
+    if (!_initialized || next_title == nullptr || _logPath[0] == '\0') {
+        return false;
+    }
+
+    if (_currentTitleCount >= _lastNumberColumns) {
+        ESP_LOGW(TAG, "appendTitle: Intento de añadir más títulos del límite configurado (%d)", _lastNumberColumns);
+        return false;
+    }
+
+    // 1. Empujamos el texto del título directamente al buffer de la librería
+    esp_err_t err = m_pushToBuffer(next_title);
+    if (err != ESP_OK) return false;
+
+    _currentTitleCount++;
+
+    // 2. Evaluamos el delimitador o cierre de línea directo
+    if (_currentTitleCount == _lastNumberColumns) {
+        err = m_pushToBuffer("\n");
+        if (err != ESP_OK) return false;
+        ESP_LOGI(TAG, "Cabecera CSV completada directamente en el buffer.");
+    } else {
+        err = m_pushToBuffer(";");
+        if (err != ESP_OK) return false;
+    }
+
+    return true;
+}
+/*
 bool Datalogger::appendTitle(const char* next_title) {
     if (!_initialized || next_title == nullptr || _logPath[0] == '\0') {
         return false;
@@ -227,7 +257,40 @@ bool Datalogger::appendTitle(const char* next_title) {
 
     return true;
 }
+*/
 
+
+bool Datalogger::appendDataToCSVRow(const char* next_data) {
+    if (!_initialized || next_data == nullptr || _logPath[0] == '\0') {
+        return false;
+    }
+    
+    if (_currentRowDataCount >= _lastNumberColumns) {
+        ESP_LOGW(TAG, "appendData: Intento de añadir más datos en una línea del límite configurado (%d)", _lastNumberColumns);
+        return false;
+    }
+
+    // 1. Empujamos el dato directamente al buffer sin buffers intermedios
+    esp_err_t err = m_pushToBuffer(next_data);
+    if (err != ESP_OK) return false;
+
+    _currentRowDataCount++;
+
+    // 2. Colocamos el terminador correspondiente
+    if (_currentRowDataCount == _lastNumberColumns) {
+        err = m_pushToBuffer("\n");
+        if (err != ESP_OK) return false;
+
+        _currentRowDataCount = 0; // Reinicio automático
+        ESP_LOGD(TAG, "Fila de datos cerrada con éxito.");
+    } else {
+        err = m_pushToBuffer(";");
+        if (err != ESP_OK) return false;
+    }
+
+    return true;
+}
+/*
 bool Datalogger::appendDataToCSVRow(const char* next_data) {
     if (!_initialized || next_data == nullptr || _logPath[0] == '\0') {
         return false;
@@ -265,6 +328,7 @@ bool Datalogger::appendDataToCSVRow(const char* next_data) {
     }
     return true;
 }
+*/
 
 bool Datalogger::newRow() {
     // Como ahora el reinicio es automático en appendDataToCSVRow al llegar al final,
@@ -366,7 +430,31 @@ esp_err_t Datalogger::appendErrorLog(const char* timestamp_msg, const char* err_
     return _fileManager->appendErrorLog(timestamp_msg, err_message); 
 }
 
+esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles) {
+    if (!_initialized) return ESP_ERR_DL_NOT_INIT;
+    if (titles == nullptr || numTitles == 0 || current_timestamp == nullptr) return ESP_ERR_INVALID_ARG;
 
+    // 1. Inicializamos la sesión base configurando las columnas (Titles + Timestamp)
+    esp_err_t err = newCSVLogSesion(current_timestamp, numTitles + 1);
+    if (err != ESP_OK) return err;
+
+    // 2. Insertamos el primer título (Timestamp) usando la función unitaria
+    if (!appendTitle("Timestamp")) {
+        return ESP_ERR_SD_WRITE_FAIL; // O el error de desbordamiento correspondiente
+    }
+
+    // 3. Insertamos el resto de los títulos en un bucle simple sin concatenaciones manuales
+    for (uint16_t i = 0; i < numTitles; i++) {
+        if (titles[i] != nullptr) {
+            if (!appendTitle(titles[i])) {
+                return ESP_ERR_SD_WRITE_FAIL;
+            }
+        }
+    }
+
+    return ESP_OK;
+}
+/*
 esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char** titles, uint16_t numTitles) {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
     if (titles == nullptr || numTitles == 0 || current_timestamp == nullptr) return ESP_ERR_INVALID_ARG;
@@ -392,8 +480,38 @@ esp_err_t Datalogger::newCSVLogSesion(const char* current_timestamp, const char*
     // Insertamos directamente en el buffer de la RAM
     return m_pushToBuffer(tempLine);
 }
+*/
 
 
+esp_err_t Datalogger::appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues) {
+    if (!_initialized) return ESP_ERR_DL_NOT_INIT;
+    if (_logPath[0] == '\0') return ESP_ERR_INVALID_STATE;
+    if (timestamp_msg == nullptr || values == nullptr || numValues == 0) return ESP_ERR_INVALID_ARG;
+
+    // Validación de columnas
+    if ((numValues + 1) != _lastNumberColumns) {
+        ESP_LOGW(TAG, "appendNewData: Cantidad de columnas inválida. Esperadas: %d, Recibidas: %d", _lastNumberColumns - 1, numValues);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // 1. Insertamos el valor del Timestamp en la fila actual
+    if (!appendDataToCSVRow(timestamp_msg)) {
+        return ESP_ERR_SD_WRITE_FAIL;
+    }
+
+    // 2. Insertamos secuencialmente cada elemento del array de valores
+    for (uint16_t i = 0; i < numValues; i++) {
+        // Si el puntero es null, enviamos una celda vacía para no romper el conteo de columnas
+        const char* dataToSend = (values[i] != nullptr) ? values[i] : ""; 
+        
+        if (!appendDataToCSVRow(dataToSend)) {
+            return ESP_ERR_SD_WRITE_FAIL;
+        }
+    }
+
+    return ESP_OK;
+}
+/*
 esp_err_t Datalogger::appendNewDataCSVToLog(const char* timestamp_msg, const char** values, uint16_t numValues) {
     if (!_initialized) return ESP_ERR_DL_NOT_INIT;
     if (_logPath[0] == '\0') return ESP_ERR_INVALID_STATE;
@@ -422,4 +540,4 @@ esp_err_t Datalogger::appendNewDataCSVToLog(const char* timestamp_msg, const cha
 
     // Enviamos la fila completa al buffer principal
     return m_pushToBuffer(tempLine);
-}
+}*/
